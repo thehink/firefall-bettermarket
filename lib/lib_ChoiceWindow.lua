@@ -36,7 +36,7 @@ PRIVATE.bp_ListItem = [[
 	</FocusBox>
 ]]
 
-function PRIVATE.Create(callback, options)
+function PRIVATE.Create(cb, options)
 	options = options or {};
 	local MBOX = ModalBox.Create(PRIVATE.bp_ChoiceList, {});
 
@@ -50,15 +50,26 @@ function PRIVATE.Create(callback, options)
 		LIST = WIDGET:GetChild("ChoiceList"),
 		ITEMS = {},
 		MaxHeight = options.MaxHeight or 600,
-		callback = callback,
+		callback = cb,
 		height = 0,
 		width = 0,
 	};
 
 	setmetatable(GROUP, ChoiceWindow_MT);
 	
+	local timeCreated = tonumber(System.GetLocalUnixTime());
+	local unfocused = false;
+	
 	SEARCH_INPUT:BindEvent("OnTextChange", function() GROUP:Filter(); end);
 	SEARCH_INPUT:BindEvent("OnSubmit", function() GROUP:SelectFirst(); end);
+	SEARCH_INPUT:BindEvent("OnLostFocus", function(args)
+		--fix for bug causing the textinput to unfocus by itself
+		local elapsedTime = tonumber(System.GetElapsedUnixTime(timeCreated));
+		if(elapsedTime < 10 and not unfocused) then
+			unfocused = true;
+			SEARCH_INPUT:SetFocus();
+		end
+	end);
 	
 	SEARCH_INPUT:SetFocus();
 	

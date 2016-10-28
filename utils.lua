@@ -29,8 +29,13 @@ function qColor(quality)
 	end
 end
 
-function timeCountDown(timeSeconds)
-	local deltaSeconds = System.GetElapsedUnixTime(timeSeconds);
+function GetTimeZone()
+
+end
+
+function timeCountDown(deltaSeconds)
+	GetTimeZone();
+	--local deltaSeconds = ads-timeSeconds; --System.GetElapsedUnixTime(timeSeconds);
 	local secs = math.abs(deltaSeconds);
 	local days = math.floor(secs / 86400);
 	local hours = math.floor(secs / 3600) % 24;
@@ -39,9 +44,14 @@ function timeCountDown(timeSeconds)
 	
 	local timeString = "";
 	if(days > 0) then
-		timeString = System.GetDate("%x %I:%M%p", timeSeconds);
+		timeString = System.GetDate("%x %I:%M%p", tonumber(System.GetLocalUnixTime()) - deltaSeconds);
 	else
-		if(hours > 0) then
+		if(days > 0) then
+			timeString = days.." day";
+			if(days > 1) then
+				timeString = timeString.."s";
+			end
+		elseif(hours > 0) then
 			timeString = hours.." hour";
 			if(hours > 1) then
 				timeString = timeString.."s";
@@ -52,18 +62,18 @@ function timeCountDown(timeSeconds)
 				timeString = timeString.."s";
 			end
 		else
-			timeString = "<1 minute";
-		--[[
+			--timeString = "<1 minute";
+
 			timeString = seconds.." second";
 			if(seconds > 1) then
 				timeString = timeString.."s";
-			end]]
+			end
 		end
 		
 		
 		
 		if(deltaSeconds < 0) then
-			timeString = timeString.." left";
+			timeString = timeString.."";
 		else
 			timeString = timeString.." ago";
 		end
@@ -74,17 +84,23 @@ end
 
 function timeParser(datetime)
 	--local datetime = "2013-10-11T21:37:49+00:00"
-	--ugly hack
-	local pattern = "(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)"
+	local pattern = "(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)+(%d+):(%d+)"
 	local xyear, xmonth, xday, xhour, xminute, 
 			xseconds, xmillies, xoffset = datetime:match(pattern);
-
-	
 	local seconds = (xyear-1970) * 31556926 + (xmonth - 1) * 2629743 + (xday-1) * 86400 + xhour * 3600 + xminute * 60 + xseconds;
-	--have to test this on different timezones
-	return seconds - 29902;
+
+	local date = System.GetDate("*t");
+
+	local ads = (date.year-1970) * 31556926 + (date.month - 1) * 2629743 + (date.day-1) * 86400 + date.hour * 3600 + date.min * 60 + date.sec;
+
+	return ads - seconds - io_TimeZone * 3600;
 end
 
+
+function comma_value(n) -- credit http://richard.warburton.it
+	local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
+	return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
+end
 
 function out(data)
   Component.GenerateEvent("MY_SYSTEM_MESSAGE", {text=tostring(data)});

@@ -41,6 +41,7 @@ local BP_ROW = [[
 SELLPAGE.categories = {
 	--{name = "All", sort = "Default"},
 	{name = "Resources", sort = "NameAndQuality", filters={"Resources"}},
+	{name = "Raw Resources", sort = "NameAndQuality", filters={"RawResources"}},
 	{name = "New You", sort = "Quality", filters={"NewYou"}},
 	{name = "Packaged", sort = "QualityAndName", filters={"Packaged"}},
 	{name = "Crafted Gear", sort = "NameAndQuality", filters={"CraftedGear"}},
@@ -48,7 +49,7 @@ SELLPAGE.categories = {
 	{name = "Components", sort = "NameAndQuality", filters={"CraftingComponents"}},
 	{name = "Bag", sort = "QualityAndName", filters={"Bag"}},
 	{name = "Other", sort = "Quality", filters={"Cache"}},
-	{name = "All (Laggy)", sort = "NameAndQuality"},
+	{name = "All", sort = "NameAndQuality"},
 };
 
 SELLPAGE_UpdateInventory = function() SELLPAGE.UpdateDisplayInventory(); end;
@@ -59,6 +60,7 @@ function SELLPAGE.initSellPage()
 	DISPATCHER:AddHandler("OnReady", SELLPAGE.OnReady);
 	DISPATCHER:AddHandler("OnMarketListingComplete", SELLPAGE.OnMarketListingComplete);
 	DISPATCHER:AddHandler("OnInventoryChanged", SELLPAGE.OnInventoryChanged);
+	DISPATCHER:AddHandler("OnSellPage", SELLPAGE.OnSetSellPage);
 
 	SELLPAGE.InitListings();
 	SELLPAGE.InitInventory();
@@ -70,6 +72,11 @@ function SELLPAGE.OnReady()
 	SELLPAGE.UpdateInventory();
 	SELLPAGE.selectCategory(1);
 	SELLPAGE.UpdateListings();
+	DISPATCHER:AddHandler("OnResolutionChanged", SELLPAGE.OnResolutionChanged);
+end
+
+function SELLPAGE.OnSetSellPage()
+	SELLPAGE.UpdateListingDisplay();
 end
 
 function SELLPAGE.OnMarketListingComplete(args)
@@ -95,18 +102,23 @@ function SELLPAGE.OnInventoryChanged(args)
 			SELLPAGE.UpdateInventory();
 			SELLPAGE.SearchAndSelectItem(SELLPAGE.selectItemOnInventoryChange);
 			SELLPAGE.selectItemOnInventoryChange = nil;
+			SetSellPage();
 		else
 			SELLPAGE.cb_InventoryUpdate = callback(function()
 				SELLPAGE.UpdateInventory();
-				if(SELLPAGE.selectItemOnInventoryChange) then
-					SELLPAGE.SearchAndSelectItem(SELLPAGE.selectItemOnInventoryChange);
-					SELLPAGE.selectItemOnInventoryChange = nil;
-				end
-			end, nil, 0.5);
+			end, nil, 2.0);
 		end
 	else
 		SELLPAGE.InventoryDirty = true;
 	end
+end
+
+function SELLPAGE.OnResolutionChanged()
+	callback(function()
+		SELLPAGE.w_TABLE:ReorderHeader();
+		SELLPAGE.INVENTORY_SCROLLER:UpdateSize();
+		SELLPAGE.w_TABLE:UpdateSize();
+	end, nil, 0.1);
 end
 
 -- ------------------------------------------
@@ -122,7 +134,8 @@ end
 
 function SELLPAGE.OnItemListed(args, err)
 	if not err then
-		SELLPAGE.UpdateListings();
+		--SELLPAGE.UpdateListings();
+		SELLPAGE.AddListingRow(args, true);
 		SELLPAGE.SetListingStatus("Listed Successfully!", "#00FF00");
 		--out("Success Error");
 	else
@@ -132,11 +145,21 @@ function SELLPAGE.OnItemListed(args, err)
 end
 
 function SELLPAGE.OnItemCanceled(args, err)
-	SELLPAGE.UpdateListings();
+	if not err then
+		SELLPAGE.RemoveListingRow(args.listing.id);
+	else
+		--todo
+		--better error handling
+	end
 end
 
 function SELLPAGE.OnItemReaped(args, err)
-	SELLPAGE.UpdateListings();
+	if not err then
+		SELLPAGE.RemoveListingRow(args.listing.id);
+	else
+		--todo
+		--better error handling
+	end
 end
 
 -- ------------------------------------------
@@ -202,7 +225,11 @@ function SELLPAGE.f_FILTER.All(item)
 end
 
 function SELLPAGE.f_FILTER.Resources(item)
-	return item.is_resource;
+	return item.is_resource and item.is_refined;
+end
+
+function SELLPAGE.f_FILTER.RawResources(item)
+	return item.is_resource and item.is_raw;
 end
 
 function SELLPAGE.f_FILTER.NewYou(item)
@@ -259,7 +286,8 @@ end
 
 function SELLPAGE.UpdateDisplayInventory()
 	--out("Update inventory");
-	SELLPAGE.INVENTORY_SCROLLER:Reset();
+	--SELLPAGE.INVENTORY_SCROLLER:Reset();
+	SELLPAGE.InitInventory();
 
 	local items = {};
 	
@@ -280,7 +308,7 @@ function SELLPAGE.UpdateDisplayInventory()
 	end
 	
 	for _, item in ipairs(items) do
-		if(item.flags.is_tradable and (#search_txt == 0 or string.find(item.name:lower(), search_txt:lower()))) then
+		if(item.flags.is_tradable and item.quantity > 0 and (#search_txt == 0 or string.find(item.name:lower(), search_txt:lower()))) then
 			local add = true;
 			if(cat.filters) then
 				for _, filter in ipairs(SELLPAGE.categories[SELLPAGE.selectedCategory].filters) do
@@ -293,14 +321,13 @@ function SELLPAGE.UpdateDisplayInventory()
 			if add then
 				local ROW = SELLPAGE.INVENTORY_SCROLLER:AddRow(tonumber("43543"..SELLPAGE.Count));
 				SELLPAGE.Count = SELLPAGE.Count + 1;
-			
 				local WIDGET = Component.CreateWidget([[
 				<Group name="row" dimensions="width:100%; height:20;" style="cursor:sys_hand">
 					<Border name="bg" dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.0; padding:5;" />
 					<Text name="title" key="{My Listings}" dimensions="left:0; width:100%-50; height:20;" style="font:Demi_11; clip:true; halign:left; valign:center; shadow:1; color:#00AA00" />
 					<Text name="quantity" key="{Quantity}" dimensions="left:100%-50; width:50; height:20;" style="font:Narrow_11; halign:right; valign:center; shadow:1; color:#AAAAAA" />
 				</Group>
-				]],ROW.GROUP);
+				]], ROW.SCROLLER.HIDDEN_FOSTER);
 				--WIDGET:SetText(item.name);
 				
 				if(item.quality and not string.find(item.name, "CY") and not string.find(item.name, "Q")) then
@@ -315,11 +342,11 @@ function SELLPAGE.UpdateDisplayInventory()
 				
 				ROW:AddHandler("OnMouseEnter", function() 
 					setBoxStats(SELLPAGE.FormatItemToMarketListing(item));
-					ToolTip.Show(STAT_BOX);
+					Tooltip.Show(STAT_BOX);
 					WIDGET:GetChild("bg"):ParamTo("alpha", 1.0, 0.15);
 				end);
 				ROW:AddHandler("OnMouseLeave", function()
-					ToolTip.Show(nil);
+					Tooltip.Show(nil);
 					WIDGET:GetChild("bg"):ParamTo("alpha", 0, 0.15);
 				end);
 				
@@ -336,26 +363,40 @@ end
 
 function SELLPAGE.UpdateInventory()
 	SELLPAGE.items, SELLPAGE.resources = Player.GetInventory();
-	SELLPAGE.resources = SELLPAGE.ParseRefinedResources(SELLPAGE.resources);
+	SELLPAGE.resources = SELLPAGE.FormatResources(SELLPAGE.resources);
 	SELLPAGE.UpdateDisplayInventory();
 end
 
-function SELLPAGE.ParseRefinedResources(resources)
-	local refined = {};
+function SELLPAGE.FormatResources(resources)
+	local stacks = {};
 	for _,v in pairs(resources) do
 		if(v.refined and v.refined.stacks) then
 			for _,stack in pairs(v.refined.stacks) do
 				if(stack.quantity > 0) then
-					stack.name = v.name;
+					stack.name = v.refined.name;
 					stack.flags = {is_tradable = true};
 					stack.is_resource = true;
-					stack.item_sdb_id = v.item_sdb_id;
-					table.insert(refined, stack);
+					stack.is_refined = true;
+					stack.item_sdb_id = v.refined.item_sdb_id;
+					table.insert(stacks, stack);
+				end
+			end
+		end
+		
+		if(v.raw and v.raw.stacks) then
+			for _,stack in pairs(v.raw.stacks) do
+				if(stack.quantity > 0) then
+					stack.name = v.raw.name;
+					stack.is_raw = true;
+					stack.flags = {is_tradable = true};
+					stack.is_resource = true;
+					stack.item_sdb_id = v.raw.item_sdb_id;
+					table.insert(stacks, stack);
 				end
 			end
 		end
 	end
-	return refined;
+	return stacks;
 end
 
 
@@ -369,10 +410,15 @@ function SELLPAGE.FormatItemToMarketListing(item)
 	}
 	
 	listing.stats.quality = item.quality or 0;
+	listing.stats.repair_pool = item.repair_pool;
 	
 	if(item.attributes) then
 		for _, attribute in ipairs(item.attributes) do
-			listing.stats[attribute.display_name] = string.format(attribute.format, attribute.value);
+			if(attribute.format ~= "") then 
+				listing.stats[attribute.display_name] = string.format(attribute.format, attribute.value);
+			else
+				listing.stats[attribute.display_name] = attribute.value;
+			end
 		end
 	end
 	if(item.constraints) then
@@ -401,16 +447,15 @@ function SELLPAGE.InitListings()
 	}
 	SELLPAGE.w_TABLE:SetHeaders(HeaderData);
 	
-	local BTN = Component.GetWidget("refresh_listings_btn");
-	BTN:BindEvent("OnMouseEnter", function()
-		BTN:GetChild("icon"):ParamTo("glow", 1, 0.15);
-	end);
-	BTN:BindEvent("OnMouseLeave", function()
-		BTN:GetChild("icon"):ParamTo("glow", 0, 0.15);
-	end);
-	BTN:BindEvent("OnMouseUp", function()
-		SELLPAGE.UpdateListings();
-	end);
+	local BTN = Component.GetWidget("claim_all_listings_btn");
+	BTN:BindEvent("OnMouseEnter", function() BTN:GetChild("icon"):ParamTo("exposure", 0.5, 0.15);  Tooltip.Show("Claim all sold listings"); end);
+	BTN:BindEvent("OnMouseLeave", function() BTN:GetChild("icon"):ParamTo("exposure", -0.2, 0.15);  Tooltip.Show(nil); end);
+	BTN:BindEvent("OnMouseUp", function() SELLPAGE.ClaimAll(); end);
+	
+	local BTN1 = Component.GetWidget("refresh_listings_btn");
+	BTN1:BindEvent("OnMouseEnter", function() BTN1:GetChild("icon"):ParamTo("exposure", 0.5, 0.15);  Tooltip.Show("Refresh listings"); end);
+	BTN1:BindEvent("OnMouseLeave", function() BTN1:GetChild("icon"):ParamTo("exposure", -0.2, 0.15); Tooltip.Show(nil); end);
+	BTN1:BindEvent("OnMouseUp", function() SELLPAGE.UpdateListings(); end);
 end
 
 function SELLPAGE.IsListingMine(id)
@@ -422,12 +467,24 @@ function SELLPAGE.IsListingMine(id)
 	return false;
 end
 
+function SELLPAGE.ClaimAll()
+	for _,listing in ipairs(SELLPAGE.listings) do
+		if(listing.purchased) then
+			MarketApi.Claim(listing, function()
+				SELLPAGE.RemoveListingRow(listing.id);
+			end);
+		end
+	end
+end
+
 function SELLPAGE.UpdateListings()
 	--GetMyListings();
+	Component.GetWidget("refresh_listings_btn"):GetChild("icon"):ParamTo("tint", "#00AAFF", 0.15);
 	MarketApi.GetMyListings(SELLPAGE.OnGetListings);
 end
 
 function SELLPAGE.OnGetListings(resp, err)
+	Component.GetWidget("refresh_listings_btn"):GetChild("icon"):ParamTo("tint", "#FFFFFF", 0.15);
 	if(err) then
 		
 	else
@@ -437,35 +494,113 @@ function SELLPAGE.OnGetListings(resp, err)
 end
 
 function SELLPAGE.UpdateListingDisplay()
-	Component.GetWidget("myListingsTitle"):SetText("My Listings ("..#SELLPAGE.listings.." slots used)");
+	SELLPAGE.UpdateListingsTitle();
 	SELLPAGE.w_TABLE:ClearRows();
 	for _,listing in ipairs(SELLPAGE.listings) do
-		local rowData = {
-			default = listing,
-			item_sdb_id = listing,
-			["title.en"] = listing,
-			price_cy = listing.price_cy,
-			price_per_unit = listing,
-			quantity = listing.quantity,
-			expires_at = listing.expires_at,
-			action_btn = listing,
-		};
-		
-		for k, v in pairs(listing.stats) do
-			rowData[k] = v;
-		end
-		
-		local ROW = SELLPAGE.w_TABLE:AddRow({height=60, vpadding = 0}, rowData, BP_ROW);
-		ROW.WIDGET:GetChild("bg"):SetParam("tint", qColor(listing.rarity));
-		
-		ROW.ROW:AddHandler("OnMouseEnter", function() setBoxStats(listing); ToolTip.Show(STAT_BOX); end);
-		ROW.ROW:AddHandler("OnMouseLeave", function() ToolTip.Show(nil); end);
+		SELLPAGE.AddListingRow(listing);
 	end
+end
+
+function SELLPAGE.UpdateListingsTitle()
+	Component.GetWidget("myListingsTitle"):SetText("My Listings ("..#SELLPAGE.listings.." slots used)");
+end
+
+function SELLPAGE.AddListingRow(listing, add)
+	if(add) then
+		table.insert(SELLPAGE.listings, listing);
+	end
+
+	local rowData = {
+		default = listing,
+		item_sdb_id = listing,
+		["title.en"] = listing,
+		price_cy = listing.price_cy,
+		price_per_unit = listing,
+		quantity = listing.quantity,
+		expires_at = listing.expires_at,
+		action_btn = listing,
+	};
+	
+	for k, v in pairs(listing.stats) do
+		rowData[k] = v;
+	end
+	
+	local ROW = SELLPAGE.w_TABLE:AddRow({height=60, vpadding = 0}, rowData, BP_ROW);
+	ROW.WIDGET:GetChild("bg"):SetParam("tint", qColor(listing.rarity));
+	
+	ROW.ROW:AddHandler("OnMouseEnter", function() setBoxStats(listing); Tooltip.Show(STAT_BOX); end);
+	ROW.ROW:AddHandler("OnMouseLeave", function() Tooltip.Show(nil); end);
+	
+	SELLPAGE.UpdateListingsTitle();
+end
+
+function SELLPAGE.RemoveListingRow(id)
+	
+	for i, listing in ipairs(SELLPAGE.listings) do
+		if(listing.id == id) then
+			table.remove(SELLPAGE.listings, i);
+		end
+	end
+
+	for _,GROUP in ipairs(SELLPAGE.w_TABLE.ROWS) do
+		if(GROUP and GROUP.data and GROUP.data.default.id == id) then
+			GROUP:Remove();
+		end
+	end
+	SELLPAGE.UpdateListingsTitle();
 end
 
 -- ------------------------------------------
 -- List Form
 -- ------------------------------------------
+
+function SELLPAGE.ShowListingConfirmation(sellData)
+	local BOX = ModalBox.Create("buyConfirmation",
+	{
+		{title = "List", align = "center", color="#00FF00", func = SELLPAGE.ListItem, args = sellData},
+		{title = "Cancel", align = "center", color="#FF0000"}
+	});
+	
+	BOX:SetDims({width=400, height=230});
+	
+	BOX:SetTitle("Listing Confirmation!");
+	local ITEM = BOX.FOSTER_WIDGET:GetChild("item");
+	
+	local ItemInfo = Game.GetItemInfoByType(sellData.item.item_sdb_id);
+	
+	local icon = ITEM:GetChild("icon");
+	icon:SetUrl(ItemInfo.web_icon);
+	
+	local label = ITEM:GetChild("label");
+	
+	LIB_ITEMS.GetNameTextFormat({
+		name = sellData.item.name,
+		rarity = sellData.item.rarity,
+	}, {quality=sellData.item.quality}):ApplyTo(label);
+	
+	--label:SetText(sellData.item.name);
+	--label:SetTextColor(qColor(sellData.item.rarity));
+	
+	local desc = BOX.FOSTER_WIDGET:GetChild("description_text");
+	desc:SetText("This confirmation is shown because the listing fee exceeds "..io_ListingPriceWarning.."cy.");
+	desc:SetTextColor("#CC3232");
+	
+	local Cy = BOX.FOSTER_WIDGET:GetChild("crystite");
+	local CyPPU = BOX.FOSTER_WIDGET:GetChild("cy_ppu");
+	local CyDelta = BOX.FOSTER_WIDGET:GetChild("cy_delta");
+	local CyLeft = BOX.FOSTER_WIDGET:GetChild("cy_left");
+	
+	local ListingFee = MarketApi.GetListingFee(sellData.price);
+	
+	local CYCount = Player.GetItemCount(10);
+	Cy:SetText(comma_value(CYCount));
+	CyPPU:SetText("Listing fee");
+	CyDelta:SetText("-"..comma_value(tostring(ListingFee)));
+	CyLeft:SetText(comma_value(CYCount-ListingFee));
+
+	ITEM:BindEvent("OnMouseEnter", function() setBoxStats(SELLPAGE.FormatItemToMarketListing(sellData.item)); Tooltip.Show(STAT_BOX); end);
+	ITEM:BindEvent("OnMouseLeave", function() Tooltip.Show(nil); end);
+end
 
 function SELLPAGE.InitListForm()
 	local LIST_BTN = SELLPAGE.W_LIST_BTN;
@@ -494,22 +629,12 @@ function SELLPAGE.InitListForm()
 				 quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText()),
 				 item = SELLPAGE.selectedItem,
 			 };
-			 
-			 LIST_BTN:GetChild("label"):SetText("Listing...");
-			 MarketApi.Sell(sellData, function(args, err)
-				LIST_BTN:GetChild("label"):SetText("List Item");
-				if(args) then
-					if(SELLPAGE.selectedItem.quantity <= sellData.quantity) then
-						Component.GetWidget("ListForm"):ParamTo("alpha", 0, 0.15);
-					end
-					SELLPAGE.selectedItem.quantity = SELLPAGE.selectedItem.quantity - sellData.quantity;
-					local QUANTITY_TEXT = Component.GetWidget("list_quantity_text");
-					QUANTITY_TEXT:SetText("Quantity ("..SELLPAGE.selectedItem.quantity..")");
-				else
-					warn(tostring(err));
-				end
-				SELLPAGE.OnItemListed(args, err);
-			 end);
+			 local listingFee = MarketApi.GetListingFee(sellData.price);
+			if(listingFee >= io_ListingPriceWarning) then
+				SELLPAGE.ShowListingConfirmation(sellData);
+			else
+				SELLPAGE.ListItem(sellData);
+			end
 		end
 	end)
 	
@@ -540,6 +665,28 @@ function SELLPAGE.InitListForm()
 			BUYPAGE.SearchForSimilarItems(SELLPAGE.FormatItemToMarketListing(SELLPAGE.selectedItem));
 		end
 	end)
+end
+
+function SELLPAGE.ListItem(sellData)
+	local LIST_BTN = SELLPAGE.W_LIST_BTN;
+	if(sellData.item) then
+		 LIST_BTN:GetChild("label"):SetText("Listing...");
+		 MarketApi.Sell(sellData, function(args, err)
+			LIST_BTN:GetChild("label"):SetText("List Item");
+			if(args) then
+				if(sellData.item.quantity <= sellData.quantity) then
+					Component.GetWidget("ListForm"):ParamTo("alpha", 0, 0.15);
+				end
+				sellData.item.quantity = sellData.item.quantity - sellData.quantity;
+				local QUANTITY_TEXT = Component.GetWidget("list_quantity_text");
+				QUANTITY_TEXT:SetText("Quantity ("..sellData.item.quantity..")");
+			else
+				warn(tostring(err));
+			end
+			SELLPAGE.OnItemListed(args, err);
+		 end);
+	end
+	return true;
 end
 
 function SELLPAGE.FindItem(listing)
@@ -632,8 +779,8 @@ function SELLPAGE.SelectItem(item, options)
 		SELLPAGE_OnPriceInput({user=true});
 	end
 	
-	ITEM_INFO:BindEvent("OnMouseEnter", function() setBoxStats(SELLPAGE.FormatItemToMarketListing(item)); ToolTip.Show(STAT_BOX); end);
-	ITEM_INFO:BindEvent("OnMouseLeave", function() ToolTip.Show(nil); end);
+	ITEM_INFO:BindEvent("OnMouseEnter", function() setBoxStats(SELLPAGE.FormatItemToMarketListing(item)); Tooltip.Show(STAT_BOX); end);
+	ITEM_INFO:BindEvent("OnMouseLeave", function() Tooltip.Show(nil); end);
 end
 
 function SELLPAGE.SetListingStatus(txt, color)
@@ -660,14 +807,14 @@ function SELLPAGE.SearchAndSelectItem(listing)
 end
 
 function SELLPAGE.UpdateFeesAndProfit(ignoreProfits)
-	local price = tonumber(SELLPAGE.W_PRICE_INPUT:GetText());
+	local price = tonumber(SELLPAGE.W_PRICE_INPUT:GetText():gsub(',', ''));
 	local listingFee = MarketApi.GetListingFee(price);
 	local reapingFee = MarketApi.GetReapingFee(price);
 	local W_LISTINGFEE = Component.GetWidget("ListingFee");
 	local W_REAPINGFEE = Component.GetWidget("ReapingFee");
 	
-	W_LISTINGFEE:SetText("-"..listingFee);
-	W_REAPINGFEE:SetText("-"..reapingFee);
+	W_LISTINGFEE:SetText("-"..comma_value(listingFee));
+	W_REAPINGFEE:SetText("-"..comma_value(reapingFee));
 	if not ignoreProfits then
 		SELLPAGE.W_PROFIT_INPUT:SetText(price-listingFee-reapingFee);
 	end
@@ -680,8 +827,8 @@ end
 function SELLPAGE_OnQuantityInput(args)
 	if(args.user) then
 		local WIDGET = Component.GetWidget("QuantityInput");
-		local txt = WIDGET:GetText();
-		local Quantity = tonumber(WIDGET:GetText());
+		local txt = WIDGET:GetText():gsub(',', '');
+		local Quantity = tonumber(WIDGET:GetText():gsub(',', ''));
 		if(Quantity < 1 and txt ~= "") then
 			WIDGET:SetText(1);
 			Quantity = 1;
@@ -689,18 +836,18 @@ function SELLPAGE_OnQuantityInput(args)
 			WIDGET:SetText(SELLPAGE.selectedItem.quantity);
 			Quantity = SELLPAGE.selectedItem.quantity;
 		end
-		local PPU = tonumber(SELLPAGE.W_PPU_INPUT:GetText());
+		local PPU = tonumber(SELLPAGE.W_PPU_INPUT:GetText():gsub(',', ''));
 		SELLPAGE.W_PRICE_INPUT:SetText(Quantity*PPU);
 		SELLPAGE.UpdateFeesAndProfit();
 	end
 end
 
 function SELLPAGE_OnQuantityLostFocus(args)
-	local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText());
+	local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText():gsub(',', ''));
 	if(Quantity < 1) then
 		Quantity = 1;
 		SELLPAGE.W_QUANTITY_INPUT:SetText(1);
-		local PPU = tonumber(SELLPAGE.W_PPU_INPUT:GetText());
+		local PPU = tonumber(SELLPAGE.W_PPU_INPUT:GetText():gsub(',', ''));
 		SELLPAGE.W_PRICE_INPUT:SetText(Quantity*PPU);
 		SELLPAGE.UpdateFeesAndProfit();
 	end
@@ -708,8 +855,8 @@ end
 
 function SELLPAGE_OnPriceInput(args)
 	if(args.user) then
-		local Price = tonumber(SELLPAGE.W_PRICE_INPUT:GetText());
-		local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText());
+		local Price = tonumber(SELLPAGE.W_PRICE_INPUT:GetText():gsub(',', ''));
+		local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText():gsub(',', ''));
 		SELLPAGE.W_PPU_INPUT:SetText(Price/Quantity);
 		SELLPAGE.UpdateFeesAndProfit();
 	end
@@ -717,9 +864,9 @@ end
 
 function SELLPAGE_OnPPUInput(args)
 	if(args.user) then
-		local ppu_txt = SELLPAGE.W_PPU_INPUT:GetText();
+		local ppu_txt = SELLPAGE.W_PPU_INPUT:GetText():gsub(',', '');
 		local PPU = tonumber(ppu_txt);
-		local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText());
+		local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText():gsub(',', ''));
 		SELLPAGE.W_PRICE_INPUT:SetText(PPU*Quantity);
 		SELLPAGE.UpdateFeesAndProfit();
 	end
@@ -727,8 +874,8 @@ end
 
 function SELLPAGE_OnProfitInput(args)
 	if(args.user) then
-		local Profit = tonumber(SELLPAGE.W_PROFIT_INPUT:GetText());
-		local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText());
+		local Profit = tonumber(SELLPAGE.W_PROFIT_INPUT:GetText():gsub(',', ''));
+		local Quantity = tonumber(SELLPAGE.W_QUANTITY_INPUT:GetText():gsub(',', ''));
 		--todo make this formula more accurate
 		local Price = math.floor((1000*Profit+2998) / 930 + 9);
 		SELLPAGE.W_PRICE_INPUT:SetText(Price);

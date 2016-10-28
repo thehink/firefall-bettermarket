@@ -3,11 +3,6 @@
 -- lib_MarketApi
 --   by: Thehink
 -- ------------------------------------------
--- Created this lib just to fill one purpose for now
--- WIP TODO:
--- C
-
---]]
 
 require "table";
 require "math";
@@ -35,6 +30,8 @@ PRIVATE.PerPage = 10;
 PRIVATE.SearchActive = false;
 
 PRIVATE.itemReferences = {};
+
+PRIVATE.ListingsCallbacks = {};
 
 ----------------------------------------------------------
 -- Callbacks
@@ -135,6 +132,7 @@ function PRIVATE.BuildQuery(args)
 end
 
 function PRIVATE.PutForSaleR(args)
+	--log("TEST: "..args.item.item_sdb_id..", "..args.item.resource_type);
 	return Market.SellResourceStack(args.item.item_sdb_id, args.item.resource_type or "", args.quantity or 1, args.price)
 end
 
@@ -147,7 +145,7 @@ function doHttpReq(args)
 		callback(doHttpReq, args, 0.1);
 		return;
 	end
-	HTTP.IssueRequest(args.url, args.method, nil, args.cb);
+	HTTP.IssueRequest(args.url, args.method, args.data, args.cb);
 end
 
 
@@ -192,7 +190,7 @@ function MarketApi.Sell(sellData, callback)
 	if not PRIVATE.Ready then
 		return;
 	end
-	
+
 	local success, internal_reference = nil;
 	
 	if(sellData.item.item_id) then
@@ -257,17 +255,24 @@ function MarketApi.GetResourceStatNames(callback)
 	end
 	local url = MARKET_HOST.."/api/v1/resources/stat_names";
 
+	local data = {["item_sdb_ids"]={78014,77703,78015,77704,78016,77705,78017,77706,78018,77707,78019,77708,78020,77709,78021,77710,78022,77711,78023,77713,78024,77714,78025,77715,78026,77716,78027,77736,78028,77737,82420,82419}};
+	
 	doHttpReq({
 		url = url,
 		method = "POST",
+		data = data,
 		cb = callback,
 	});
 end
 
 
 function MarketApi.GetMyListings(callback)
-	if not PRIVATE.Ready then
+	if not PRIVATE.Ready or (callback and PRIVATE.ListingsCallbacks[callback]) then
 		return;
+	end
+	
+	if(callback) then
+		PRIVATE.ListingsCallbacks[callback] = true;
 	end
 	
 	local url = MARKET_HOST.."/api/v1/my_listings";
@@ -275,7 +280,10 @@ function MarketApi.GetMyListings(callback)
 	doHttpReq({
 		url = url,
 		method = "GET",
-		cb = callback,
+		cb = function(args, err)
+			PRIVATE.ListingsCallbacks[callback] = nil;
+			callback(args, err);
+		end,
 	});
 end
 
@@ -316,39 +324,26 @@ function MarketApi.GetMinPrice()
 end
 
 function MarketApi.GetMaxPrice()
-	return 999999999;
+	return 99999999;
 end
 
 function MarketApi.SearchListings(args, cb_OnComplete, cb_OnError)
 	if not PRIVATE.Ready then
 		return;
 	end
-	--[[
 	
-	args = {
-		string = "asd",
-		categories = {1,2,3},
-		max_price = 50,
-		min_price = 50,
-	}
-	
-	]]
-
 	PRIVATE.cb_Complete = cb_OnComplete;
 	PRIVATE.cb_Error = cb_OnError;
-	
 	
 	PRIVATE.CurrentPage = args.page or PRIVATE.CurrentPage;
 	local newQuery = PRIVATE.BuildQuery(args);
 	
 	if(PRIVATE.Query == newQuery and PRIVATE.SearchActive) then
-		--warn("Already Requesting that URL!!!");
+		--warn("Already Requesting that URL");
 		return;
 	else
 		PRIVATE.Query = newQuery;
 	end
 	
 	PRIVATE.DoSearch();
-	
-	--Component.GenerateEvent("MY_SYSTEM_MESSAGE", {text=tostring(buildQuery(args))});
 end

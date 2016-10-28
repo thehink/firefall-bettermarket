@@ -4,9 +4,9 @@
 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xsd">
 	<Info
-		title="ARES Exchange"
+		title="ARES Texchange"
 		author="Thehink"
-		description="Alternative Market GUI"
+		description="Alternative Market"
 		url=""
 		uiVersion="1000"
 	/>
@@ -17,10 +17,13 @@ xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xs
 		<Event name="ON_MARKET_LISTING_COMPLETE" 		bind="OnMarketListingComplete"/>
 		<Event name="ON_RESOLUTION_CHANGED"				bind="OnResolutionChanged"/>
 		<Event name="MY_HIDE_WEBUI"						bind="OnHideWebUI"/>
-
-		<Event name="ON_RESOURCES_CHANGED"		    bind="OnInventoryChanged" />
-		<Event name="ON_RESOURCE_ITEM_CHANGED"		bind="OnInventoryChanged" />
-		<Event name="ON_INVENTORY_ITEM_CHANGED"		bind="OnInventoryChanged" />
+		<Event name="ON_TERMINAL_AUTHORIZED"			bind="OnTerminalAuthorized"/>
+		<Event name="MY_SHOW_WEBUI"						bind="OnShowWebUI"/>
+		<Event name="ON_EXIT_ZONE"						bind="OnExitZone" />
+		<Event name="ON_STREAM_PROGRESS"				bind="OnStreamProgress" />
+		<Event name="ON_RESOURCES_CHANGED"		    	bind="OnInventoryChanged" />
+		<Event name="ON_RESOURCE_ITEM_CHANGED"			bind="OnInventoryChanged" />
+		<Event name="ON_INVENTORY_ITEM_CHANGED"			bind="OnInventoryChanged" />
 	</Events>
 
 	<Textures>
@@ -89,12 +92,12 @@ xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xs
 			</FocusBox>
 			<Text name="description_text" dimensions="top:80; width:100%-20; center-x:50%; height:100%-70;" style="font:Narrow_13; color:#AAAAAA; halign:left; wrap:true; valign:top; alpha:1.0" key="{Balance}"/>
 			<Text name="cy_balance_text" dimensions="top:100%-70; width:100%-20; center-x:50%; height:20;" style="font:Narrow_11; color:#AAAAAA; halign:left; valign:center; alpha:1.0" key="{Balance}"/>
-			<Text name="crystite" dimensions="top:100%-70; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#00EEEE; halign:right; valign:center; alpha:1.0" key="{5645645}"/>
-			<Text name="cy_ppu" dimensions="top:100%-50; width:100%-20; center-x:50%; height:20;" style="font:Narrow_11; color:#AAAAAA; halign:left; valign:center; alpha:1.0" key="{-6546}"/>
-			<Text name="cy_delta" dimensions="top:100%-50; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#FF0000; halign:right; valign:center; alpha:1.0" key="{-6546}"/>
+			<Text name="crystite" dimensions="top:100%-70; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#00EEEE; halign:right; valign:center; alpha:1.0" key="{0}"/>
+			<Text name="cy_ppu" dimensions="top:100%-50; width:100%-20; center-x:50%; height:20;" style="font:Narrow_11; color:#AAAAAA; halign:left; valign:center; alpha:1.0" key="{-0}"/>
+			<Text name="cy_delta" dimensions="top:100%-50; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#FF0000; halign:right; valign:center; alpha:1.0" key="{-0}"/>
 			<StillArt name="Line" dimensions="top:100%-30; width:100%-20; center-x:50%; height:1;" style="texture:colors; region:white; tint:#00AAFF; hotpoint:1;  alpha:1.0;"/>
 			<Text name="cy_left_text" dimensions="top:100%-32; width:100%-20; center-x:50%; height:20;" style="font:Narrow_11; color:#AAAAAA; halign:left; valign:center; alpha:1.0" key="{Remaining balance}"/>
-			<Text name="cy_left" dimensions="top:100%-30; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#00EEEE; halign:right; valign:center; alpha:1.0" key="{5435345}"/>
+			<Text name="cy_left" dimensions="top:100%-30; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#00EEEE; halign:right; valign:center; alpha:1.0" key="{0}"/>
 		</BluePrint>
 		
 		<BluePrint name="sliderFilter" instantiable="true">
@@ -202,9 +205,9 @@ xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xs
 	</BluePrints>
 
 	<Frames>
-		<PanelFrame name="HoverBox" dimensions="center-x:50%; center-y:50%; width:390; height:300" permanent="true" visible="false" depth="-33">
+		<PanelFrame name="HoverBox" dimensions="center-x:50%; center-y:50%; width:340; height:300" permanent="true" visible="false" depth="-33">
 			<Children>
-				<Group id="ToolTip" dimensions="width:370; height:300;" style="alpha:1">
+				<Group id="ToolTip" dimensions="width:340; height:300;" style="alpha:1">
 					<!--<Border dimensions="dock:fill" class="SolidBackDrop" />-->
 					<ListLayout id="BoxStats" dimensions="width:100%; bottom:100%; top:30;" style="vpadding:3">
 						
@@ -238,15 +241,15 @@ xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xs
 					</FocusBox>
 					
 					<WebImage id="crystite_icon" name="Icon" dimensions="left:50%+200; width:30; height:30;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
-					<Text id="crystite_count" key="{65346346}" dimensions="left:50%+245; width:50; height:50;" style="font:Demi_12; halign:center; valign:center; shadow:0; color:#00AAFF" />
+					<Text id="crystite_count" key="{65346346}" dimensions="left:50%+230; width:50; height:50;" style="font:Demi_12; halign:left; valign:center; shadow:0; color:#00AAFF" />
 					
 					
-					<Text key="{ARES Exchange}" dimensions="top:0; left:100; width:100%; height:100%" style="font:Demi_15; halign:left; valign:center; shadow:0; color:PanelTitle" />
+					<Text id="AddonName" key="{ARES Exchange}" dimensions="top:0; left:20; width:100%; height:100%" style="font:Demi_15; halign:left; valign:center; shadow:0; color:PanelTitle" />
 				</Group>
 				<!---------------------------------
 				--	Sell Page
 				----------------------------------->
-				<Group id="sell_page" dimensions="center-x: 50%; top:60; height:87%; width: 80%;" style="alpha:1">
+				<Group id="sell_page" dimensions="center-x: 50%; top:60; height:87%; width: 100%;" style="alpha:1">
 					<Group id="inventory" dimensions = "left: 0; width:500; height:100%;">
 						<Border name="panelheader" dimensions="width:100%; top:0; bottom:40;" class="PanelBackDrop" />
 						<Text key="{Inventory}" dimensions="top:0; left:10; width:100%; height:40" style="font:Demi_15; halign:center; valign:center; shadow:0; color:PanelTitle" />
@@ -272,8 +275,12 @@ xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xs
 					<Group id="listings" dimensions="left: 508; right:100%; height:100%;">
 						<Border name="panelheader" dimensions="width:100%; top:0; bottom:40;" class="PanelBackDrop" />
 						<Text id="myListingsTitle" key="{My Listings}" dimensions="top:0; left:10; width:100%; height:40" style="font:Demi_15; halign:center; valign:center; shadow:0; color:PanelTitle" />
+						
+						<FocusBox id="claim_all_listings_btn" dimensions="top:5; left:100%-70; width:30; height:30;" class="ui_button">
+							<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-4; width:100%-4;" style="texture:icons; region:business; exposure:-0.3; tint:#FFFFFF; cursor:sys_hand;"/>
+						</FocusBox>
 						<FocusBox id="refresh_listings_btn" dimensions="top:5; left:100%-35; width:30; height:30;" class="ui_button">
-							<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-4; width:100%-4;" style="texture:icons; region:rotate; tint:#FFFFFF; cursor:sys_hand;"/>
+							<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-4; width:100%-4;" style="texture:icons; region:rotate; exposure:-0.3; tint:#FFFFFF; cursor:sys_hand;"/>
 						</FocusBox>
 						<Border name="panelbody" dimensions="width:100%; top:45; bottom:100%-200;" class="PanelBackDrop" />
 						<Group id="listingsTable" dimensions="width:100%; top:45; bottom:100%-205;"/>
@@ -363,7 +370,7 @@ xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xs
 				<!---------------------------------
 				--	Buy Page
 				----------------------------------->
-				<Group id="buy_page" dimensions="center-x: 50%; top:60; height:87%; width: 80%;" style="alpha:1">
+				<Group id="buy_page" dimensions="center-x: 50%; top:60; height:87%; width: 100%;" style="alpha:1">
 					<Border name="panelbody" dimensions="dock:fill" class="PanelBackDrop" />
 
 					<Group dimensions="left:11; top:5; bottom:100%-10; width:319" class="SolidBackDrop">
@@ -436,9 +443,19 @@ xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xs
 							<Text key="{Filters}" dimensions="top:0; left:10; height: 32; width:100%;" style="font:UbuntuBold_13; halign:left; valign:center; color:#00AAFF;"/>
 							<Border dimensions="height:100%; width:100%-10; left:5;" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
 							
-							<FocusBox id="add_filter_btn" dimensions="top:4; right:100%-10; height: 25; width:25;" class="ui_button">
+							<FocusBox id="add_quality_filter" dimensions="top:4; right:100%-145; height: 25; width:25;" class="ui_button">
 								<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
-								<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Demi_11; halign:center; valign:center; cursor:sys_hand;" key="{+}"/>
+								<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Demi_11; halign:center; valign:center; cursor:sys_hand;" key="{Q}"/>
+							</FocusBox>
+							
+							<FocusBox id="add_price_filter" dimensions="top:4; right:100%-115; height: 25; width:25;" class="ui_button">
+								<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+								<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-4; width:100%-4;" style="texture:icons; region:business; tint:#FFFFFF; cursor:sys_hand;"/>
+							</FocusBox>
+							
+							<FocusBox id="add_filter_btn" dimensions="top:4; right:100%-10; height: 25; width:100;" class="ui_button">
+								<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+								<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Demi_11; halign:center; valign:center; cursor:sys_hand;" key="{Add Filter...}"/>
 							</FocusBox>
 							
 							<!--<Choice id="FilterChoice" dimensions="top:30; left:10; width:100%-80; height:30;"/>

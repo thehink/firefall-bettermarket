@@ -1,14 +1,10 @@
-
 --
 -- Market Addon
 --   by: Thehink
 --
 --[[
 TODO:
-Fix some chosen ??? tooltip bug
 Add inventory repair pool stats in tooltip
-Add Expires at in tooltip to listings
-
 ]]
 --
 --
@@ -43,9 +39,14 @@ require "./SellPage"
 require "./utils"
 require "./CellTemplates"
 
+local ADDON_NAME = "ARES Texchange";
+local ADDON_VERSION = "BETA v0.55";
+
 local FRAME = Component.GetFrame("Main");
 local BUY_PAGE = Component.GetWidget("buy_page");
 local SELL_PAGE = Component.GetWidget("sell_page");
+local TITLE = Component.GetWidget("AddonName");
+TITLE:SetText(ADDON_NAME);
 
 local ICON_CRYSTITE = Component.GetWidget("crystite_icon");
 local ICON_COUNT = Component.GetWidget("crystite_count");
@@ -54,6 +55,7 @@ STAT_BOX = Component.GetWidget("ToolTip");
 local STAT_BOX_TITLE = Component.GetWidget("BoxTxt");
 local STAT_BOX_STATS = Component.GetWidget("BoxStats");
 
+local HUDNOTE = nil;
 
 DISPATCHER = EventDispatcher.Create();
 
@@ -63,15 +65,6 @@ local SLASH = {};
 -- MARKET VARIABLES
 -- ------------------------------------------
 
-local rarities = {
-	legendary = 5,
-	epic = 4,
-	rare = 3,
-	uncommon = 2,
-	common = 1,
-	salvage = 0,
-}
-
 local INGAME_HOST = nil;
 
 local currentCategories = {0};
@@ -79,13 +72,73 @@ local currentCategories = {0};
 local ListingsCycle = nil;
 local SoldListings = {};
 
+local currentTerminal = "NONE";
+local marketIsReady = false;
+local is_RequestingListings = false;
+local is_RequestingAccess = false;
+
 playerId = nil;
 MarketAttributes = nil;
 ResourceStatNames = nil;
-local marketIsReady = false;
+Authorized = false;
+
 
 marketVisible = false;
 CurrentTab = "";
+
+local SOUNDS = {
+	{title="None", name="none"},
+	{title="Play_UI_RewardNotification", name="Play_UI_RewardNotification"},
+	{title="Play_UI_Beep_01", name="Play_UI_Beep_01"},
+	{title="Play_SFX_UI_MissionComplete", name="Play_SFX_UI_MissionComplete"},
+	{title="Play_SFX_UI_AchievementEarned", name="Play_SFX_UI_AchievementEarned"},
+	{title="Play_UI_MapOpen", name="Play_UI_MapOpen"},
+	{title="Play_UI_Garage_PowerUpgrade", name="Play_UI_Garage_PowerUpgrade"},
+	{title="Play_SFX_UI_GeneralAnnouncement", name="Play_SFX_UI_GeneralAnnouncement"},
+	{title="Play_UI_Garage_MassUpgrade", name="Play_UI_Garage_MassUpgrade"},
+	{title="Play_PAX_FirefallSplash_Victory", name="Play_PAX_FirefallSplash_Victory"},
+	{title="Play_UI_RewardScreenOpen", name="Play_UI_RewardScreenOpen"},
+	{title="Play_UI_RewardsAward", name="Play_UI_RewardsAward"},
+	{title="Play_PAX_FirefallSplash_Firefall", name="Play_PAX_FirefallSplash_Firefall"},
+	{title="Play_PAX_FirefallSplash_Defeat", name="Play_PAX_FirefallSplash_Defeat"},
+};
+
+local TimeZones = {
+	{name = "UTC-12:00", hours = -12},
+	{name = "UTC-11:00", hours = -11},
+	{name = "UTC-10:00", hours = -10},
+	{name = "UTC-09:00", hours = -9},
+	{name = "UTC-08:00", hours = -8},
+	{name = "UTC-07:00", hours = -7},
+	{name = "UTC-06:00", hours = -6},
+	{name = "UTC-05:00", hours = -5},
+	{name = "UTC-04:30", hours = -4.5},
+	{name = "UTC-04:00", hours = -4},
+	{name = "UTC-03:30", hours = -3.5},
+	{name = "UTC-03:00", hours = -3},
+	{name = "UTC-02:00", hours = -2},
+	{name = "UTC-01:00", hours = -1},
+	{name = "UTC+00:00", hours = 0},
+	{name = "UTC+01:00", hours = 1},
+	{name = "UTC+02:00", hours = 2},
+	{name = "UTC+03:00", hours = 3},
+	{name = "UTC+03:30", hours = 3.5},
+	{name = "UTC+04:00", hours = 4},
+	{name = "UTC+04:30", hours = 4.5},
+	{name = "UTC+05:00", hours = 5},
+	{name = "UTC+05:30", hours = 5.5},
+	{name = "UTC+05:45", hours = 5.75},
+	{name = "UTC+06:00", hours = 6},
+	{name = "UTC+06:30", hours = 6.5},
+	{name = "UTC+07:00", hours = 7},
+	{name = "UTC+08:00", hours = 8},
+	{name = "UTC+09:00", hours = 9},
+	{name = "UTC+09:30", hours = 9.5},
+	{name = "UTC+10:00", hours = 10},
+	{name = "UTC+11:00", hours = 11},
+	{name = "UTC+12:00", hours = 12},
+	{name = "UTC+13:00", hours = 13},
+};
 
 local TEXT_CODES = {
 	ERR_INVALID_PRICE_LOW = "Below minimum price of 50 cy.",
@@ -96,27 +149,110 @@ local TEXT_CODES = {
 -- INTERFACE OPTIONS
 -- ------------------------------------------
 local onOption = {};
+local OptionsLoaded = false;
 local io_Enabled = true;
---[[
-InterfaceOptions.SaveVersion(1.0)
-InterfaceOptions.NotifyOnDefaults(true)
+local io_ReplaceDefaultMarket = true;
+local io_NotifyOnSold = false;
+local io_NotifySFX = "none";
+local io_HudNoteOnSold = true;
+local io_SystemMsg = false;
+local io_CheckFrequency = 10;
+io_TimeZone = 0;
+io_ListingPriceWarning = 10000;
 
-InterfaceOptions.StartGroup({label="Better Market"})
-InterfaceOptions.StopGroup()]]
+InterfaceOptions.SaveVersion(1.0)
+--InterfaceOptions.NotifyOnDefaults(true);
+InterfaceOptions.NotifyOnLoaded(true);
+
+InterfaceOptions.StartGroup({id="REPLACE_DEAFULT_MARKET", label=ADDON_NAME.." - "..ADDON_VERSION, checkbox=true, default=io_ReplaceDefaultMarket})
+--InterfaceOptions.AddCheckBox({id="REPLACE_DEAFULT_MARKET", label="Override default market bindings", default=io_ReplaceDefaultMarket});
+InterfaceOptions.AddSlider({id="LISTING_PRICE_WARNING", label="Listing price warning threshold", default=io_ListingPriceWarning, min=0, max=99999, inc=1000, suffix="cy"});
+
+InterfaceOptions.AddChoiceMenu({id="TIMEZONE", label="Time Zone", default=io_TimeZone})
+for i = 1, #TimeZones do
+	InterfaceOptions.AddChoiceEntry({menuId="TIMEZONE", label=TimeZones[i].name, val=TimeZones[i].hours});
+end
+
+InterfaceOptions.StopGroup()
+
+InterfaceOptions.StartGroup({id="NOTIFY_ON_SOLD", label="Notifier options", checkbox=true, default=io_NotifyOnSold})
+InterfaceOptions.AddCheckBox({id="HUDNOTE_ON_SOLD", label="Create a HudNote when items are sold", default=io_HudNoteOnSold});
+InterfaceOptions.AddCheckBox({id="NOTIFY_MSG", label="Show a message for each item sold", default=io_SystemMsg});
+InterfaceOptions.AddSlider({id="LISTINGS_CHECK_FREQUENCY", label="Listings check frequency.", default=io_CheckFrequency, min=60, max=500, inc=1, suffix="s"});
+
+InterfaceOptions.AddChoiceMenu({id="SOLD_SOUND", label="Sold sound FX", default=io_NotifySFX})
+for i = 1, #SOUNDS do
+	InterfaceOptions.AddChoiceEntry({menuId="SOLD_SOUND", label=SOUNDS[i].title, val=SOUNDS[i].name});
+end
+
+InterfaceOptions.StopGroup()
+
 
 -- ------------------------------------------
 -- OPTION CHANGE CALLBACKS
 -- ------------------------------------------
 
-onOption.ENABLED = function(val)
+onOption.__LOADED = function(val)
+	OptionsLoaded = true;
+end
 
+onOption.TIMEZONE = function(val)
+	io_TimeZone = val;
+end
+
+onOption.SOLD_SOUND = function(val)
+	io_NotifySFX = val;
+	if(OptionsLoaded and io_NotifySFX ~= "none") then
+		System.PlaySound(io_NotifySFX);
+	end
+end
+
+onOption.LISTINGS_CHECK_FREQUENCY = function(val)
+	io_CheckFrequency = val;
+	if(ListingsCycle.CB2:Pending()) then
+		ListingsCycle:Stop();
+		ListingsCycle.start_time = System.GetClientTime();
+		ListingsCycle.CB2:Bind(function()
+			ListingsCycle.func();
+			if (not len or System.GetElapsedTime(ListingsCycle.start_time) < len) then
+				ListingsCycle.CB2:Reschedule(io_CheckFrequency);
+			end
+		end);
+		ListingsCycle.CB2:Schedule(io_CheckFrequency);
+	end
+end
+
+onOption.REPLACE_DEAFULT_MARKET = function(val)
+	io_ReplaceDefaultMarket = val;
+end
+
+onOption.NOTIFY_ON_SOLD = function(val)
+	io_NotifyOnSold = val;
+	if(io_NotifyOnSold) then
+		RequestAccess();
+		ListingsCycle:Run(io_CheckFrequency);
+	else
+		ListingsCycle:Stop();
+	end
+end
+
+onOption.HUDNOTE_ON_SOLD = function(val)
+	io_HudNoteOnSold = val;
+end
+
+onOption.NOTIFY_MSG = function(val)
+	io_SystemMsg = val;
+end
+
+onOption.LISTING_PRICE_WARNING = function(val)
+	io_ListingPriceWarning = val;
 end
 
 -- EVENTS
 
 function OnComponentLoad()
-	--InterfaceOptions.SetCallbackFunc(OnOptionChange, "Better Market");
-	LIB_SLASH.BindCallback({slash_list = "market,ma", description = "open the market addon", func = SLASH.toggleMarket});
+	InterfaceOptions.SetCallbackFunc(OnOptionChange, ADDON_NAME);
+	LIB_SLASH.BindCallback({slash_list = "market,ma", description = "Opens "..ADDON_NAME, func = SLASH.toggleMarket});
 	--LIB_SLASH.BindCallback({slash_list = "run_test", description = " runs the sort test on all possible stats", func = SLASH.TEST});
 
 	INGAME_HOST = System.GetOperatorSetting("ingame_host");
@@ -140,6 +276,9 @@ function OnPlayerReady()
 	playerId = Player.GetCharacterId();
 	UpdateCurrencyCount();
 	CheckMarketReady();
+	if not marketIsReady then
+		Market.Toggle(true);
+	end
 end
 
 function OnGetAttributes(resp, err)
@@ -153,12 +292,12 @@ function OnGetResourceStatNames(resp, err)
 end
 
 function CheckMarketReady()
-	if not marketIsReady and Player.IsReady() and MarketAttributes and ResourceStatNames then
+	if not marketIsReady and Player.IsReady() and MarketAttributes and Authorized then
+		MarketApi.GetMyListings(OnGetMyListings);
 		marketIsReady = true;
 		OnMarketReady();
-		--todo fix the autoupdate listing system
 		--WebCache.Subscribe(System.GetOperatorSetting("market_host").."/api/v1/my_listings", OnGetMyListings);
-		ListingsCycle:Run(60);
+		--ListingsCycle:Run(60);
 	end
 end
 
@@ -200,28 +339,76 @@ end
 
 function OnResolutionChanged()
 	local width, height = Component.GetScreenSize();
-	if(width < 1400) then
-		BUY_PAGE:SetDims("center-x: 50%; top:60; height:90%; width: 100%;");
-		SELL_PAGE:SetDims("center-x: 50%; top:60; height:90%; width: 100%;");
+	DISPATCHER:DispatchEvent("OnResolutionChanged");
+		--BUY_PAGE:SetDims("center-x: 50%; top:60; height:90%; width: 100%;");
+		--SELL_PAGE:SetDims("center-x: 50%; top:60; height:90%; width: 100%;");
+end
+
+function OnExitZone()
+	Authorized = false;
+	HideMarket();
+end
+
+function OnStreamProgress()
+	if(Game.GetLoadingProgress() == 1) then
+		RequestAccess();
 	end
 end
 
+function OnShowWebUI(args)
+	if(args.panel == "marketplace" and io_ReplaceDefaultMarket) then
+		Component.GenerateEvent("MY_WEBUI_TOGGLE", {show=false});
+	else
+		--HideMarket();
+	end
+end
 
+function OnTerminalAuthorized(args)
+	--out(currentTerminal .. " => " .. args.terminal_type);
 
-
+	if(args.terminal_type == "PLAYER_MARKET" and io_ReplaceDefaultMarket) then
+		Authorized = true;
+		
+		if not is_RequestingAccess then
+			if(marketIsReady) then
+				ShowMarket();
+			else
+				CheckMarketReady();
+			end
+		else
+			is_RequestingAccess = false;
+		end
+	else
+		Authorized = false;
+		HideMarket();
+		if(currentTerminal ~= "PLAYER_MARKET" and args.terminal_type == "NONE" and io_NotifyOnSold) then
+			RequestAccess();
+		end
+	end
+	
+	currentTerminal = args.terminal_type;
+end
 
 ----------------------------------------------------------
 -- MARKET RESPONSE
 -- -------------------------------------------------------
 
 function OnGetMyListings(args, err)
-	if not err then
+	is_RequestingListings = false;
+	if not err and io_NotifyOnSold then
 		SELLPAGE.listings = args;
+		local listings = {};
 		for _,listing in pairs(args) do
 			if not SoldListings[listing.id] and listing.purchased then
+				if(io_SystemMsg) then
+					out("You have sold "..listing.quantity.." "..listing.title.." for "..listing.price_cy.."cy");
+				end
 				SoldListings[listing.id] = true;
-				NotifySoldListing(listing);
+				table.insert(listings, listing);
 			end
+		end
+		if(#listings > 0 and io_HudNoteOnSold) then
+			NotifySoldListing(listings);
 		end
 	end
 end
@@ -231,7 +418,9 @@ end
 -- -------------------------------------------------------
 
 function GetMyListings()
-	MarketApi.GetMyListings(OnGetMyListings);
+	if Authorized and marketIsReady then
+		MarketApi.GetMyListings(OnGetMyListings);
+	end
 end
 
 function LookupText(code)
@@ -243,6 +432,18 @@ function LookupText(code)
 	else
 		return code or "";
 	end
+end
+
+function CancelListing(args)
+	
+end
+
+function ReapListing(args)
+	
+end
+
+function ListItem(args)
+	
 end
 
 ----------------------------------------------------------
@@ -259,7 +460,10 @@ function initButtons()
 	CLOSE_BUTTON:BindEvent("OnMouseLeave", function() CBTN1:ParamTo("exposure", 0, 0.15); end);
 	
 	
-	local Tabs = {{"buy_tab", SetBuyPage}, {"sell_tab", SetSellPage}};
+	local Tabs = {
+		{"buy_tab", SetBuyPage},
+		{"sell_tab", SetSellPage},
+	};
 	
 	for _,v in ipairs(Tabs) do
 		local BUTTON = Component.GetWidget(v[1]);
@@ -282,7 +486,7 @@ function SetBuyPage()
 	CurrentTab = "buy_tab";
 	SELL_PAGE:Hide(true);
 	BUY_PAGE:Show(true);
-	--out("BUY");
+	DISPATCHER:DispatchEvent("OnBuyPage");
 end
 
 function SetSellPage()
@@ -295,13 +499,12 @@ function SetSellPage()
 	CurrentTab = "sell_tab";
 	BUY_PAGE:Hide(true);
 	SELL_PAGE:Show(true);
-	
-
-	--out("SELL");
+	SELLPAGE.W_SEARCH_INPUT:SetFocus();
+	DISPATCHER:DispatchEvent("OnSellPage");
 end
 
 function UpdateCurrencyCount()
-	ICON_COUNT:SetText(Player.GetItemCount(10));
+	ICON_COUNT:SetText(comma_value(Player.GetItemCount(10)));
 end
 
 ----------------------------------------------------------
@@ -312,15 +515,15 @@ function OnSelectAction(args)
 	if(args ~= "nothing") then
 		args.WIDGET:SetSelectedByIndex(1);
 		if(args.action == "cancel") then
-			MarketApi.Cancel(args.listing, SELLPAGE.OnItemCanceled);
+			MarketApi.Cancel(args.listing, function(resp, err) SELLPAGE.OnItemCanceled(args, err); end);
 			args.WIDGET:Disable(true);
 			args.WIDGET.TEXT:SetText("Canceling");
 		elseif(args.action == "reap") then
-			MarketApi.Claim(args.listing, SELLPAGE.OnItemReaped);
+			MarketApi.Claim(args.listing, function(resp, err) SELLPAGE.OnItemReaped(args, err); end);
 			args.WIDGET:Disable(true);
 			args.WIDGET.TEXT:SetText("Claiming");
 		elseif(args.action == "reap_list_again") then
-			MarketApi.Claim(args.listing, SELLPAGE.OnItemReaped);
+			MarketApi.Claim(args.listing, function(resp, err) SELLPAGE.OnItemReaped(args, err); end);
 			args.WIDGET:Disable(true);
 			args.WIDGET.TEXT:SetText("Claiming");
 			SELLPAGE.SearchAndSelectItem(args.listing);
@@ -329,10 +532,9 @@ function OnSelectAction(args)
 			SetSellPage();
 		elseif(args.action == "relist") then
 			SELLPAGE.selectItemOnInventoryChange = args.listing;
-			MarketApi.Cancel(args.listing, SELLPAGE.OnItemCanceled);
+			MarketApi.Cancel(args.listing, function(resp, err) SELLPAGE.OnItemCanceled(args, err); end);
 			args.WIDGET:Disable(true);
 			args.WIDGET.TEXT:SetText("Canceling");
-			SetSellPage();
 		elseif(args.action == "buy_item") then
 			BUYPAGE.ShowBuyConfirmation(args.WIDGET, args.listing);
 		end
@@ -340,30 +542,36 @@ function OnSelectAction(args)
 end
 
 ----------------------------------------------------------
--- SORT METHODS
-----------------------------------------------------------
-
-
-----------------------------------------------------------
 -- HUD Note
 ----------------------------------------------------------
 
-function NotifySoldListing(listing)
-	local HUDNOTE = HudNote.Create();
-	HUDNOTE:SetTitle("Sold "..listing.quantity.." "..listing.title, "for "..listing.price_cy.." cy.");
+function NotifySoldListing(listings)
+	RemoveHudNote();
+	HUDNOTE = HudNote.Create();
+	HUDNOTE:SetTitle("You have "..#listings.." new sold item(s)");
 	HUDNOTE:SetIconTexture("icons", "business");
-	HUDNOTE:SetDescription("for "..listing.price_cy.." cy. Show my listings?");
+	HUDNOTE:SetDescription("Show my listings?");
 
 	HUDNOTE:SetTags({"mission"})
 	HUDNOTE:SetPrompt(1, Component.LookupText("LOBBY_NOTE_PROMPT_SHOW"), function()
-		SELLPAGE.UpdateListingDisplay();
 		SetSellPage();
-		ShowMarket();
+		Market.Toggle(true);
 		HUDNOTE:Remove();
 	end);
-	HUDNOTE:SetPrompt(2, "No", function() HUDNOTE:Remove(); end);
-	HUDNOTE:SetTimeout(120, function() HUDNOTE:Remove(); end);
+	HUDNOTE:SetPrompt(2, "No", RemoveHudNote);
+	HUDNOTE:SetTimeout(120, RemoveHudNote);
 	HUDNOTE:Post();
+	
+	if(io_NotifySFX ~= "none") then
+		System.PlaySound(io_NotifySFX);
+	end
+end
+
+function RemoveHudNote()
+	if(HUDNOTE and HUDNOTE.Remove) then
+		HUDNOTE:Remove();
+		HUDNOTE = nil;
+	end
 end
 
 ----------------------------------------------------------
@@ -431,7 +639,32 @@ function setBoxStats(item)
 		item.stats["Expires"] = timeCountDown(timeParser(item.expires_at));
 	end
 	
+	item.stats["Prestige"] = item.prestige;
+	
+	local stats = {};
+	
 	for stat,val in pairs(item.stats) do
+		table.insert(stats, {
+			stat = stat,
+			val = val,
+		});
+	end
+	
+	table.sort(stats, function(a, b) 
+		if(tonumber(a.stat) > 0 and tonumber(b.stat) == 0) then
+			return true;
+		elseif(tonumber(a.stat) > 0 and tonumber(b.stat) > 0) then
+			return a.val < b.val;
+		elseif(tonumber(a.stat) == 0 and tonumber(b.stat) == 0) then
+			return a.stat < b.stat;
+		end
+	end);
+	
+	
+	
+	for i,v in ipairs(stats) do
+		local stat = v.stat;
+		local val = v.val;
 		if(stat ~= "mass" and stat ~= "power" and stat ~= "cpu") then
 			local WIDGET = Component.CreateWidget("statEntry2", STAT_BOX_STATS);
 			WIDGET:SetDims("top:0; height:"..height);
@@ -444,7 +677,7 @@ function setBoxStats(item)
 			end
 
 			if(item.resource_type) then
-				if(ResourceStatNames[tostring(item.item_sdb_id)]) then
+				if(ResourceStatNames[tostring(item.item_sdb_id)] and ResourceStatNames[tostring(item.item_sdb_id)]["stat"..stat]) then
 					stat = ResourceStatNames[tostring(item.item_sdb_id)]["stat"..stat] or "stat"..stat;
 					VALUE_TEXT:SetTextColor(qColor(val));
 				end
@@ -485,20 +718,31 @@ end
 ----------------------------------------------------------
 -- FUNCTIONS
 -- -------------------------------------------------------
+function RequestAccess()
+	if(not Authorized and marketIsReady) then
+		is_RequestingAccess = true;
+		Market.Toggle(true);
+	end
+end
+
 
 function ShowMarket()
-	marketVisible = true;
-	FRAME:Show(true);
-	System.BlurMainScene(true);
-	DISPATCHER:DispatchEvent("ShowMarket");
+	if not marketVisible then
+		marketVisible = true;
+		FRAME:Show(true);
+		System.BlurMainScene(true);
+		DISPATCHER:DispatchEvent("ShowMarket");
+	end
 end
 
 function HideMarket()
-	marketVisible = false;
-	FRAME:Hide(true);
-	ToolTip.Show(nil);
-	System.BlurMainScene(false);
-	DISPATCHER:DispatchEvent("HideMarket");
+	if(marketVisible) then
+		marketVisible = false;
+		FRAME:Hide(true);
+		Tooltip.Show(nil);
+		System.BlurMainScene(false);
+		DISPATCHER:DispatchEvent("HideMarket");
+	end
 end
 
 ----------------------------------------------------------
@@ -509,7 +753,11 @@ SLASH.toggleMarket = function()
 	if(marketVisible) then
 		HideMarket()
 	else
-		ShowMarket()
+		if Authorized then
+			ShowMarket();
+		else
+			Market.Toggle(true);
+		end
 	end
 end
 local testing = nil;

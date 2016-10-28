@@ -1,6 +1,6 @@
 -- ------------------------------------------
 -- lib_Table
---   by: Thehink  --mostly, some code here and there was taken from r5 libs
+--   by: Thehink
 -- ------------------------------------------
 -- WIP TODO:
 -- complete more features
@@ -25,8 +25,10 @@ Table.Blueprints = {};
 
 local PRIVATE = {};
 local API = {};
+local ROWAPI = {};
 
 local Table_MT = {__index = function(self, key) return API[key] end}
+local TableRow_MT = {__index = function(self, key) return ROWAPI[key] end}
 
 local SCROLLER_EVENTS = {"OnScroll", "OnScrollTo", "OnScrollHeightChanged", "OnSliderShow"};
 local ROW_EVENTS = {"OnMouseDown", "OnMouseUp", "OnMouseEnter", "OnMouseLeave", "OnScoped", "OnRemoved"};
@@ -114,9 +116,9 @@ function Table.Create(PARENT, hdr)
 	return TBL;
 end
 
-function Table.CreateCellBlueprint(name, BP, func)
+function Table.CreateCellBlueprint(name, BP, func, destroy)
 	BP = '<Group name="'..name..'" dimensions="height:100%; width:100%;">'..BP..'</Group>';
-	Table.Blueprints[name] = {blueprint= BP, populate=func};
+	Table.Blueprints[name] = {blueprint= BP, populate=func, destroy=destroy};
 	return Table.Blueprints[name];
 end
 
@@ -173,12 +175,12 @@ function API.ReorderHeader(self)
 	for _,GROUP in pairs(self.HEADER_CELLS) do
 		totalWidth = totalWidth + GROUP.data.width;
 	end
-	
+
 	self.totalWidth = totalWidth;
+	local headerWidth = self.HEADER:GetBounds().width;
 	
 	for i,GROUP in ipairs(self.HEADER_CELLS) do
 		GROUP.index = i;
-		local headerWidth = self.HEADER:GetBounds().width;
 		local newWidth = GROUP.data.width;
 		if(totalWidth > headerWidth) then
 			newWidth = headerWidth*GROUP.data.width/totalWidth;
@@ -195,6 +197,13 @@ function API.ReorderHeader(self)
 		end
 		
 		GROUP.WIDGET:SetDims(offset.."; width:"..newWidth.."; height:"..HeaderHeight..";");
+		
+		for _,ROW in ipairs(self.ROWS) do
+			local CELL = ROW.CELLS[i];
+			if(CELL and CELL.data.name == GROUP.data.name) then
+				CELL.WIDGET:SetDims(offset.."; width:"..newWidth.."; height:_");
+			end
+		end
 	end
 end
 
@@ -225,7 +234,6 @@ function API.AddHeaderCell(self, v, index)
 						self.sortAsc = true;
 					end
 				end
-				
 				self:SortBy(v.name, self.sortAsc);
 			end
 		end);
@@ -303,12 +311,15 @@ function API.AddRow(self, dims, data, WIDGET)
 	local GROUP = {};
 	GROUP.height = dims.height or 50;
 	GROUP.vpadding = dims.vpadding or 0;
-	GROUP.ROW = self.SCROLLER:AddRow(tonumber("534534"..self.Count));
+	GROUP.id = tonumber("534534"..self.Count);
+	GROUP.ROW = self.SCROLLER:AddRow(GROUP.id);
 	GROUP.data = data;
+	GROUP.CELLS = {};
+	GROUP.PARENT = self;
 	self.Count = self.Count + 1;
 	
 	if(not Component.IsWidget(WIDGET)) then
-		GROUP.WIDGET = Component.CreateWidget(WIDGET or [[<Group name="row" dimensions="width:100%; height:50;"></Group>]], GROUP.ROW.GROUP);
+		GROUP.WIDGET = Component.CreateWidget(WIDGET or [[<Group name="row" dimensions="width:100%; height:50;"></Group>]], GROUP.ROW.SCROLLER.ROWS.GROUP);
 	end
 	
 	GROUP.WIDGET:SetDims("width:100%; height:"..GROUP.height..";");
@@ -319,7 +330,7 @@ function API.AddRow(self, dims, data, WIDGET)
 		local v = GR.data;
 		local blueprint = Table.GetBlueprint(v.blueprint) or Table.GetBlueprint("default");
 		local CELL = Component.CreateWidget(blueprint.blueprint, GROUP.WIDGET);
-		blueprint.populate(CELL, data[v.name], v.format);
+		local POP_DATA = blueprint.populate(CELL, data[v.name], v.format, GROUP);
 		
 		local newWidth = GR.newWidth;
 		local offset = "left: "..leftOffset;
@@ -330,10 +341,25 @@ function API.AddRow(self, dims, data, WIDGET)
 			leftOffset = leftOffset + newWidth;
 		end
 		
+		local G_CELL = {
+			data = v,
+			WIDGET = CELL,
+		};
+		
+		if(blueprint.destroy) then
+			G_CELL.RemoveFunc = function()
+				blueprint.destroy(CELL, POP_DATA, data[v.name]);
+			end
+		end
+		
 		if(CELL) then
 			CELL:SetDims(offset.."; width:"..newWidth.."; height:_");
+			table.insert(GROUP.CELLS, G_CELL);
 		end
 	end
+	
+	
+	setmetatable(GROUP, TableRow_MT);
 	
 	GROUP.ROW:SetWidget(GROUP.WIDGET);
 	GROUP.ROW:UpdateSize({height=GROUP.height + GROUP.vpadding - 2});
@@ -343,15 +369,53 @@ end
 
 function API.ClearRows(self)
 	for i = #self.ROWS, 1, -1 do
-		local GROUP = self.ROWS[i];
-		GROUP.ROW:Remove();
-		table.remove(self.ROWS, i);
+		self:RemoveRowAt(i);
+	end
+end
+
+function API.RemoveRowAt(self, index)
+	local GROUP = self.ROWS[index];
+	self:RemoveRow(GROUP);
+end
+
+function API.RemoveRow(self, GROUP)
+	if(GROUP) then
+		for _,CELL in ipairs(GROUP.CELLS) do
+			if(CELL.RemoveFunc) then
+				CELL.RemoveFunc();
+			end
+		end
+	
+		if(GROUP.ROW.Remove) then
+			GROUP.ROW:Remove();
+		end
+		
+		for k,v in pairs(GROUP) do
+			--GROUP[k] = nil;
+		end
+		
+		--setmetatable(GROUP, nil);
+		
+		for i,ROW in ipairs(self.ROWS) do
+			if(GROUP.id == ROW.id) then
+				table.remove(self.ROWS, i);
+			end
+		end
+		GROUP = nil;
 	end
 end
 
 function API.Destroy(self)
 	self.SCROLLER:Destroy();
 	Componenent.RemoveWidget(self.GROUP);
+end
+
+function API.UpdateSize(self)
+	self.SCROLLER:UpdateSize();
+end
+
+function ROWAPI.Remove(self)
+	self.PARENT:RemoveRow(self);
 end
 
 --create default blueprint

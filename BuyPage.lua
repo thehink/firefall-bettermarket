@@ -1,15 +1,18 @@
 BUYPAGE = {
+	w_SEARCH_INPUT = Component.GetWidget("SearchInput"),
+	--
 	w_CATEGORY_CHOICE = Component.GetWidget("CategoryChoice"),
 	w_CATEGORY_CHILDREN = Component.GetWidget("CategoryChildren"),
-	w_SEARCH_INPUT = Component.GetWidget("SearchInput"),
 	CATCHOICE = nil,
 	CAT_CHILDREN = {},
+	--
 	w_FILTER_CHOICE = Component.GetWidget("FilterChoice"),
 	FILTERS = {},
 	FILTER_CHOICE = nil,
 	FILTER_SCROLLER = nil,
 	AddedFilters = {},
 	FilterCount = 0,
+	--
 	w_SEARCH_MSG = Component.GetWidget("SearchError"),
 	w_PAGE_BUTTONS = Component.GetWidget("PageButtons"),
 	w_TABLE = nil,
@@ -30,6 +33,7 @@ BUYPAGE = {
 function BUYPAGE.initBuyPage()
 	BUYPAGE.HideSearchError();
 	DISPATCHER:AddHandler("OnReady", BUYPAGE.OnReady);
+	DISPATCHER:AddHandler("OnBuyPage", BUYPAGE.OnSetBuyPage);
 end
 
 function BUYPAGE.OnReady()
@@ -39,6 +43,19 @@ function BUYPAGE.OnReady()
 	BUYPAGE.initNav();
 	BUYPAGE.initConstraints();
 	BUYPAGE.firstLoad = false;
+	
+	DISPATCHER:AddHandler("OnResolutionChanged", BUYPAGE.OnResolutionChanged);
+end
+
+function BUYPAGE.OnResolutionChanged()
+	callback(function()
+		BUYPAGE.w_TABLE:ReorderHeader();
+		BUYPAGE.w_TABLE:UpdateSize();
+	end, nil, 0.1);
+end
+
+function BUYPAGE.OnSetBuyPage()
+	BUYPAGE.w_SEARCH_INPUT:SetFocus();
 end
 
 BUYPAGE.currentSearchData = nil;
@@ -62,6 +79,8 @@ function BUYPAGE.ShowBuyConfirmation(GROUP, listing)
 		{title = "Cancel", align = "center", color="#FF0000"}
 	});
 	
+	BOX:SetDims({width=500, height=300});
+	
 	BOX:SetTitle("Purchase Confirmation");
 	local ITEM = BOX.FOSTER_WIDGET:GetChild("item");
 	
@@ -71,8 +90,14 @@ function BUYPAGE.ShowBuyConfirmation(GROUP, listing)
 	icon:SetUrl(ItemInfo.web_icon);
 	
 	local label = ITEM:GetChild("label");
-	label:SetText(listing.title);
-	label:SetTextColor(qColor(listing.rarity));
+	
+	LIB_ITEMS.GetNameTextFormat({
+		name = listing.title,
+		rarity = listing.rarity,
+	}, {quality=listing.stats.quality}):ApplyTo(label);
+	
+	--label:SetText(listing.title);
+	--label:SetTextColor(qColor(listing.rarity));
 	
 	local desc = BOX.FOSTER_WIDGET:GetChild("description_text");
 	desc:SetText(ItemInfo.description);
@@ -83,14 +108,14 @@ function BUYPAGE.ShowBuyConfirmation(GROUP, listing)
 	local CyLeft = BOX.FOSTER_WIDGET:GetChild("cy_left");
 	
 	local CYCount = Player.GetItemCount(10);
-	Cy:SetText(CYCount);
-	CyPPU:SetText("("..tostring(listing.price_per_unit).." cy/u)");
-	CyDelta:SetText("-"..tostring(listing.price_cy));
-	CyLeft:SetText(CYCount-listing.price_cy);
+	Cy:SetText(comma_value(CYCount));
+	CyPPU:SetText("("..comma_value(tostring(listing.price_per_unit)).." cy/u)");
+	CyDelta:SetText("-"..comma_value(tostring(listing.price_cy)));
+	CyLeft:SetText(comma_value(CYCount-listing.price_cy));
 	
 
-	ITEM:BindEvent("OnMouseEnter", function() setBoxStats(listing); ToolTip.Show(STAT_BOX); end);
-	ITEM:BindEvent("OnMouseLeave", function() ToolTip.Show(nil); end);
+	ITEM:BindEvent("OnMouseEnter", function() setBoxStats(listing); Tooltip.Show(STAT_BOX); end);
+	ITEM:BindEvent("OnMouseLeave", function() Tooltip.Show(nil); end);
 end
 
 function BUYPAGE.RelistListing(args)
@@ -232,8 +257,8 @@ function BUYPAGE.UpdateResults()
 		local ROW = BUYPAGE.w_TABLE:AddRow({height=60, vpadding = 0}, rowData, BUYPAGE.BP_ROW);
 		ROW.WIDGET:GetChild("bg"):SetParam("tint", qColor(listing.rarity));
 		
-		ROW.ROW:AddHandler("OnMouseEnter", function() setBoxStats(listing); ToolTip.Show(STAT_BOX); end);
-		ROW.ROW:AddHandler("OnMouseLeave", function() ToolTip.Show(nil); end);
+		ROW.ROW:AddHandler("OnMouseEnter", function() setBoxStats(listing); Tooltip.Show(STAT_BOX); end);
+		ROW.ROW:AddHandler("OnMouseLeave", function() Tooltip.Show(nil); end);
 	end
 	BUYPAGE.UpdatePaging();
 end
@@ -489,7 +514,7 @@ function BUYPAGE.UpdateHeaders()
 		{title="Type", name="item_sdb_id", blueprint="type", width=70, sort=true, sortFunc = BUYPAGE.sortTest},
 		{title="Title",  name="title.en", blueprint="title", width=350, sort=true, sortFunc = BUYPAGE.sortTest},
 		{title="Quality",  name="quality", blueprint="quality", width=90, sort=true, sortFunc = BUYPAGE.sortTest},
-		{title="Quantity",  name="quantity", width=100, sort=true, sortFunc = BUYPAGE.sortTest},
+		{title="Quantity",  name="quantity", blueprint="number", width=100, sort=true, sortFunc = BUYPAGE.sortTest},
 		{title="Price",  name="price_cy", blueprint="price_cy", width=90, sort=true, sortFunc = BUYPAGE.sortTest},
 		{title="PPU",  name="price_per_unit", blueprint="price_per_unit", width=90, sort=true, sortFunc = BUYPAGE.sortTest},
 		{title="+",  name="add_header_cell", width=40, onClick=BUYPAGE.AddHeaderCellMenu},
@@ -500,7 +525,10 @@ function BUYPAGE.UpdateHeaders()
 end
 
 function BUYPAGE.AddHeaderCellMenu(GROUP)
-	local MENU = SMenu.Create(BUYPAGE.w_TABLE.HEADER, BUYPAGE.AddHeaderCell);
+	--local MENU = SMenu.Create(BUYPAGE.w_TABLE.HEADER, BUYPAGE.AddHeaderCell);
+	
+	local MENU = ChoiceWindow.Create(BUYPAGE.AddHeaderCell);
+	MENU:SetTitle("Select sort variable...");
 	
 	local predefinedHeaders = {
 		type = true,
@@ -576,10 +604,14 @@ function BUYPAGE.initConstraints()
 				end
 			end
 			
-			BUYPAGE.AddFilter({title="Mass", name="stat_mass", type="slider", min=0, max=2000, img="crystitepic"}, {min=0, max=constraints.mass});
-			BUYPAGE.AddFilter({title="Power", name="stat_power", type="slider", min=0, max=2000, img="crystitepic"}, {min=0, max=constraints.power});
-			BUYPAGE.AddFilter({title="CPU", name="stat_cpu", type="slider", min=0, max=2000, img="crystitepic"}, {min=0, max=constraints.cpu});
+			BUYPAGE.AddFilter({title="Mass", name="stat_mass", type="range"}, {min=0, max=math.floor(constraints.mass)});
+			BUYPAGE.AddFilter({title="Power", name="stat_power", type="range"}, {min=0, max=math.floor(constraints.power)});
+			BUYPAGE.AddFilter({title="CPU", name="stat_cpu", type="range"}, {min=0, max=math.floor(constraints.cpu)});
 			BUYPAGE.Search();
+		else
+			BUYPAGE.AddFilter({title="Mass", name="stat_mass", type="range"});
+			BUYPAGE.AddFilter({title="Power", name="stat_power", type="range"});
+			BUYPAGE.AddFilter({title="CPU", name="stat_cpu", type="range"});
 		end
 	end);
 	local CBTN2 = BUTTON:GetChild("bgbtn");
@@ -692,7 +724,26 @@ function BUYPAGE.initFilters()
 	--	BUYPAGE.FILTER_CHOICE:AddItem(filter.title, filter);
 	--end
 	
-	local BUTTON = Component.GetWidget("add_filter_btn");
+	local BUTTON = Component.GetWidget("add_quality_filter");
+	BUTTON:BindEvent("OnMouseDown", function()
+		BUYPAGE.AddFilter({title="Quality", name="stat_quality", type="range"});
+	end);
+	local CBTN2 = BUTTON:GetChild("bgbtn");
+	BUTTON:BindEvent("OnMouseEnter", function() CBTN2:ParamTo("exposure", 1, 0.15); end);
+	BUTTON:BindEvent("OnMouseLeave", function() CBTN2:ParamTo("exposure", 0, 0.15); end);
+	BUTTON = nil;
+	
+	BUTTON = Component.GetWidget("add_price_filter");
+	BUTTON:BindEvent("OnMouseDown", function()
+		BUYPAGE.AddFilter({title="Price", name="price", type="range"}, {max=Player.GetItemCount(10)});
+		BUYPAGE.Search(BUYPAGE.currentSearchData.page);
+	end);
+	local CBTN2 = BUTTON:GetChild("bgbtn");
+	BUTTON:BindEvent("OnMouseEnter", function() CBTN2:ParamTo("exposure", 1, 0.15); end);
+	BUTTON:BindEvent("OnMouseLeave", function() CBTN2:ParamTo("exposure", 0, 0.15); end);
+	BUTTON = nil;
+	
+	BUTTON = Component.GetWidget("add_filter_btn");
 	BUTTON:BindEvent("OnMouseDown", function()
 		local CW = ChoiceWindow.Create(BUYPAGE.AddFilter);
 		CW:SetTitle("Select Filter...");
@@ -754,9 +805,9 @@ function BUYPAGE.AddFilter(filt, values)
 		BUYPAGE.FilterCount = BUYPAGE.FilterCount + 1;
 		GROUP.ROW = BUYPAGE.FILTER_SCROLLER:AddRow(tonumber("123123"..BUYPAGE.FilterCount));
 		if(filter.type=="single") then
-			GROUP.filterWidget = Component.CreateWidget("singleFilter", GROUP.ROW.GROUP);
+			GROUP.filterWidget = Component.CreateWidget("singleFilter", GROUP.ROW.SCROLLER.HIDDEN_FOSTER);
 		else
-			GROUP.filterWidget = Component.CreateWidget("textFilter", GROUP.ROW.GROUP);
+			GROUP.filterWidget = Component.CreateWidget("textFilter", GROUP.ROW.SCROLLER.HIDDEN_FOSTER);
 		end
 		local WRAPPER = GROUP.filterWidget:GetChild("wrapper");
 
@@ -776,10 +827,10 @@ function BUYPAGE.AddFilter(filt, values)
 		
 		if(values) then
 			if(filter.type=="single") then
-				WRAPPER:GetChild("wr2.value"):SetText(values.value);
+				WRAPPER:GetChild("wr2.value"):SetText(values.value or "");
 			else
-				WRAPPER:GetChild("wr2.min"):SetText(values.min);
-				WRAPPER:GetChild("wr2.max"):SetText(values.max);
+				WRAPPER:GetChild("wr2.min"):SetText(values.min or "");
+				WRAPPER:GetChild("wr2.max"):SetText(values.max or "");
 			end
 		end
 		
@@ -802,10 +853,10 @@ function BUYPAGE.AddFilter(filt, values)
 		local GROUP = BUYPAGE.AddedFilters[filter.name];
 		local WRAPPER = GROUP.filterWidget:GetChild("wrapper");
 		if(filter.type=="single") then
-			WRAPPER:GetChild("wr2.value"):SetText(values.value);
+			WRAPPER:GetChild("wr2.value"):SetText(values.value or "");
 		else
-			WRAPPER:GetChild("wr2.min"):SetText(values.min);
-			WRAPPER:GetChild("wr2.max"):SetText(values.max);
+			WRAPPER:GetChild("wr2.min"):SetText(values.min or "");
+			WRAPPER:GetChild("wr2.max"):SetText(values.max or "");
 		end
 	end
 end
@@ -855,7 +906,9 @@ function BUYPAGE.removeCategoryChildren(level)
 		local GROUP = BUYPAGE.CAT_CHILDREN[i];
 		--GROUP.CHOICE:Destroy();  //undefined even though its listed in the usage list in lib_DropDownList
 		Component.RemoveWidget(GROUP.CHOICE.GROUP);
-		Component.RemoveFrame(GROUP.CHOICE.DROPDOWN_FRAME);
+		if(GROUP.CHOICE.FRAME) then
+			Component.RemoveFrame(GROUP.CHOICE.FRAME);
+		end
 		Component.RemoveWidget(GROUP.CHOICE_WIDGET);
 		GROUP.CHOICE = nil;
 		table.remove(BUYPAGE.CAT_CHILDREN, i);

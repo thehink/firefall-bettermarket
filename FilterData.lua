@@ -36,6 +36,11 @@ sort_variables = jsontotable([[
 [
 	{
 		"format" : "%s", 
+		"title" : "Prestige", 
+		"name" : "prestige"
+	}, 
+	{
+		"format" : "%s", 
 		"title" : "Expires", 
 		"name" : "expires_at"
 		"blueprint" : "expires_at",
@@ -47,7 +52,7 @@ sort_variables = jsontotable([[
 	}, 
 	{
 		"format" : "%.02f%% lower cost", 
-		"title" : "Power Cost", 
+		"title" : "Power Modifier", 
 		"name" : "power_mod1"
 	}, 
 	{
@@ -152,7 +157,7 @@ sort_variables = jsontotable([[
 	}, 
 	{
 		"format" : "%+.0f%%", 
-		"title" : "Repair Pool", 
+		"title" : "Repair Pool Modifier", 
 		"name" : "repair_pool_mod1"
 	}, 
 	{
@@ -327,7 +332,7 @@ sort_variables = jsontotable([[
 	}, 
 	{
 		"format" : "%.02f%% lower cost", 
-		"title" : "Mass Cost", 
+		"title" : "Mass Modifier", 
 		"name" : "mass_mod1"
 	}, 
 	{
@@ -573,9 +578,10 @@ categories = {
 	{name="Ability Module", ids = {61}},
 	{name="Thumper Beacon", ids = {80}},
 	{name="Crafting Components", ids = {3321},subcategories = {
-			{name="Optional", ids = {1920}},
-			{name="Drops", ids = {3446}},
-		}},
+		{name="Optional", ids = {1920}},
+		{name="Drops", ids = {3446}},
+	}},
+
 	{name="Battleframe Progression", ids = {1603}},
 	{name="Resources", ids = {15}, subcategories = {
 		{name="Mineral", ids = {3298}, subcategories = {
@@ -601,6 +607,9 @@ categories = {
 			{name="Toxins", ids = {145}},
 		}}
 	}},
+	
+	{name="Deployable", ids = {81}},
+	
 	{name="Consumables", ids = {84, 89, 82}, subcategories = {
 		{name="Vehicles", ids = {84}},
 		{name="Pet", ids = {89}},
@@ -610,4 +619,5 @@ categories = {
 
 	{name="Currency", ids = {207}},
 	{name="Encapsulated Super-Melded Cell", ids = {3378}},
+	
 };
