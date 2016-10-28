@@ -1,0 +1,482 @@
+
+<?xml version="1.0" encoding="utf-8"?>
+<Component xmlns="http://www.red5studios.com/"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.red5studios.com/ ../../../../schemas/component.xsd">
+	<Info
+		title="ARES Exchange"
+		author="Thehink"
+		description="Alternative Market GUI"
+		url=""
+		uiVersion="1000"
+	/>
+
+	<Events>
+		<Event name="ON_COMPONENT_LOAD"					bind="OnComponentLoad" />
+		<Event name="ON_PLAYER_READY"					bind="OnPlayerReady" />
+		<Event name="ON_MARKET_LISTING_COMPLETE" 		bind="OnMarketListingComplete"/>
+		<Event name="ON_RESOLUTION_CHANGED"				bind="OnResolutionChanged"/>
+		<Event name="MY_HIDE_WEBUI"						bind="OnHideWebUI"/>
+
+		<Event name="ON_RESOURCES_CHANGED"		    bind="OnInventoryChanged" />
+		<Event name="ON_RESOURCE_ITEM_CHANGED"		bind="OnInventoryChanged" />
+		<Event name="ON_INVENTORY_ITEM_CHANGED"		bind="OnInventoryChanged" />
+	</Events>
+
+	<Textures>
+		<Texture name="AchievementPlates" src="components/MainUI/Panels/AchievementWindow/achievement_progress_plates.png" premultiplied="false">
+			<Region name="Daily_Backplate" top="0" bottom="36" left="0" right="549" />
+			<Region name="Daily_Frontplate" top="36" bottom="72" left="0" right="549" />
+			<Region name="Small_Backplate" top="72" bottom="102" left="0" right="514" />
+			<Region name="Small_Frontplate" top="102" bottom="132" left="0" right="514" />
+		</Texture>
+	</Textures>
+	
+	<Styles>
+		<StyleSheet name="BlueBackDrop" parent="PanelSubBackDrop">
+			alpha:0.7;
+			tint:#112233;
+		</StyleSheet>
+		<StyleSheet name="GreyBackDrop" parent="PanelSubBackDrop">
+			alpha:0.7;
+			tint:#222222;
+		</StyleSheet>
+		<StyleSheet name="CenterText">
+			valign:center;
+			halign:center;
+		</StyleSheet>
+		<StyleSheet name="LeftText">
+			valign:center;
+			halign:left;
+		</StyleSheet>
+		<StyleSheet name="RightText">
+			valign:center;
+			halign:right;
+		</StyleSheet>
+		<StyleSheet name="SolidBackDrop" parent="PanelSubBackDrop">  
+			alpha:1;
+			tint:#000000;
+			eatsmice:false;
+		</StyleSheet>   
+		<StyleSheet name="CategoryBackDrop" parent="PanelSubBackDrop">  
+			alpha:1;
+			tint:#555555;
+		</StyleSheet>
+		<StyleSheet name="CategoryBackDrop" parent="PanelSubBackDrop">  
+			alpha:1;
+			tint:#555555;
+		</StyleSheet> 
+	</Styles>
+
+	<BluePrints>
+		<!---------------------------------
+		--	inventory category blueprint --
+		----------------------------------->
+		<BluePrint name="InventoryCategory" instantiable="true" dimensions="width:100%; height:30;">
+			<FocusBox name="categoryBtn" dimensions="width:100%; height:30;" class="ui_button">
+				<Border name="bg" class="SmallBorders" dimensions="dock:fill" style="alpha:0.8; padding:5; tint:#111111; shadow:1"/>
+				<Text name="title" key="{Category}" dimensions="dock:fill" style="font:Narrow_11; halign:center; valign:center; shadow:0; color:#00AAFF;" />
+			</FocusBox>
+		</BluePrint>
+		<!---------------------------------
+		--	Buy Confirmation --
+		----------------------------------->
+		<BluePrint name="buyConfirmation" instantiable="true">
+			<FocusBox name="item" dimensions="top: 10; width:100%-20; center-x:50%; height: 60;">
+				<Border dimensions="dock:fill" class="BlueBackDrop"/>
+				<WebImage name="icon" dimensions="left:5; width:50; height:50; center-y: 50%;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
+				<Text name="label" dimensions="left: 60; center-y:50%; right:100%-10; height:100%;" style="font:Narrow_15B; wrap:true; color:#00EEEE; halign:left; valign:center; alpha:1.0" key="{Arcporter}"/>
+			</FocusBox>
+			<Text name="description_text" dimensions="top:80; width:100%-20; center-x:50%; height:100%-70;" style="font:Narrow_13; color:#AAAAAA; halign:left; wrap:true; valign:top; alpha:1.0" key="{Balance}"/>
+			<Text name="cy_balance_text" dimensions="top:100%-70; width:100%-20; center-x:50%; height:20;" style="font:Narrow_11; color:#AAAAAA; halign:left; valign:center; alpha:1.0" key="{Balance}"/>
+			<Text name="crystite" dimensions="top:100%-70; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#00EEEE; halign:right; valign:center; alpha:1.0" key="{5645645}"/>
+			<Text name="cy_ppu" dimensions="top:100%-50; width:100%-20; center-x:50%; height:20;" style="font:Narrow_11; color:#AAAAAA; halign:left; valign:center; alpha:1.0" key="{-6546}"/>
+			<Text name="cy_delta" dimensions="top:100%-50; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#FF0000; halign:right; valign:center; alpha:1.0" key="{-6546}"/>
+			<StillArt name="Line" dimensions="top:100%-30; width:100%-20; center-x:50%; height:1;" style="texture:colors; region:white; tint:#00AAFF; hotpoint:1;  alpha:1.0;"/>
+			<Text name="cy_left_text" dimensions="top:100%-32; width:100%-20; center-x:50%; height:20;" style="font:Narrow_11; color:#AAAAAA; halign:left; valign:center; alpha:1.0" key="{Remaining balance}"/>
+			<Text name="cy_left" dimensions="top:100%-30; width:100%-20; center-x:50%; height:20;" style="font:Demi_13; color:#00EEEE; halign:right; valign:center; alpha:1.0" key="{5435345}"/>
+		</BluePrint>
+		
+		<BluePrint name="sliderFilter" instantiable="true">
+			<Text name="name" dimensions="width:100%; height:15;" class="LeftText" style="font:Demi_11; color:friendly"/>
+			<Group name="wrapper" dimensions="center-x:50%; width:100%-20; height:40;">
+				<Border dimensions="dock:fill" class="BlueBackDrop"/>
+				<Group name="SliderGroup" dimensions="left:0; right:100%; center-y:50%; height:17"/>
+				<FocusBox name="remove_btn" dimensions="right:100%; top:0; center-x:50%; width:26; height:26;">
+					<Border class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5"/>
+					<StillArt name="X" dimensions="center-x:50%; center-y:50%; width:100%-10; height:100%-10" style="texture:Window; region:X; tint:#B82F06"/>
+				</FocusBox>
+			</Group>
+		</BluePrint>
+		<BluePrint name="textFilter" instantiable="true">
+			<Text key="{Price: Min-Max}" name="name" dimensions="top:0; left:5; height:20; width:100%;" class="LeftText" style="font:Demi_10; color:friendly"/>
+			<Group name="wrapper" dimensions="top:20; center-x:50%; width:100%-20; height:100%-20;">
+				<Border dimensions="dock:fill" class="BlueBackDrop"/>
+				<Group name="wr2" dimensions="left:10; right:100%-45; height:70%; center-y:50%;">
+					<TextInput name="min" dimensions="height:100%; left:0; right:50%-10;" class="Chat, #TextInput" style="alpha:1.0; valign:center; wrap:false; maxlen:7; texture:colors; region:black;">
+						<Events>
+							<!--<OnTextChange bind="filterNumber"/>
+							<OnSubmit bind="OnTextSubmit"/>-->
+							<OnSubmit bind="OnSearchSubmit"/>
+						</Events>
+					</TextInput>
+					
+					<Text key="{-}" dimensions="dock:fill;" class="CenterText" style="font:Demi_15; color:friendly"/>
+					
+					<TextInput name="max" dimensions="height:100%; left:50%+10; right:100%;" class="Chat, #TextInput" style="alpha:1.0; valign:center; wrap:false; texture:colors; region:black;">
+						<Events>
+							<!--<OnTextChange bind="filterNumber"/>
+							<OnSubmit bind="OnTextSubmit"/>-->
+							<OnSubmit bind="OnSearchSubmit"/>
+						</Events>
+					</TextInput>
+				</Group>
+				<FocusBox name="remove_btn" class="ui_button" dimensions="right:100%-4; center-y:50%; width:26; height:26;">
+					<!--<Border class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5"/>-->
+					<StillArt name="X" dimensions="center-x:50%; center-y:50%; width:100%-10; height:100%-10" style="texture:Window; region:X; tint:#006EB7;  cursor:sys_hand;"/>
+				</FocusBox>
+			</Group>
+		</BluePrint>
+		<BluePrint name="singleFilter" instantiable="true">
+			<Text key="{SDB: Value}" name="name" dimensions="top:0; left:5; height:20; width:100%;" class="LeftText" style="font:Demi_10; color:friendly"/>
+			<Group name="wrapper" dimensions="top:20; center-x:50%; width:100%-20; height:100%-20;">
+				<Border dimensions="dock:fill" class="BlueBackDrop"/>
+				<Group name="wr2" dimensions="left:10; right:100%-45; height:70%; center-y:50%;">
+					<TextInput name="value" dimensions="height:100%; left:10; right:100%;" class="Chat, #TextInput" style="alpha:1.0; valign:center; wrap:false; texture:colors; region:black;">
+						<Events>
+							<OnSubmit bind="OnSearchSubmit"/>
+						</Events>
+					</TextInput>
+				</Group>
+				<FocusBox name="remove_btn" class="ui_button" dimensions="right:100%-4; center-y:50%; width:26; height:26;">
+					<!--<Border class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5"/>-->
+					<StillArt name="X" dimensions="center-x:50%; center-y:50%; width:100%-10; height:100%-10" style="texture:Window; region:X; tint:#006EB7;  cursor:sys_hand;"/>
+				</FocusBox>
+			</Group>
+		</BluePrint>
+		<BluePrint name="statEntry" instantiable="true">
+			<Border dimensions="left:4; right:60%-2; top:4; bottom:100%" class="BlueBackDrop"/>
+			<Border dimensions="left:60%+2; right:100%-4; top:4; bottom:100%" class="GreyBackDrop"/>
+			<Text name="stat" dimensions="left:4; right:60%-2; top:4; bottom:100%" class="LeftText" style="font:Demi_10;"/>
+			<Text name="value" dimensions="left:60%+2; right:100%-4; top:6; bottom:100%" class="LeftText" style="font:Demi_10; color:friendly"/>
+		</BluePrint>
+		<BluePrint name="statEntry2" instantiable="true">
+			<!--<Border dimensions="left:4; right:60%-2; top:4; bottom:100%" class="BlueBackDrop"/>
+			<Border dimensions="left:60%+2; right:100%-4; top:4; bottom:100%" class="GreyBackDrop"/>-->
+			<Text name="stat" dimensions="left:4; right:50%; height:10;" class="RightText" style="font:Demi_10; wrap:false;"/>
+			<Text name="value" dimensions="left:50%+5; right:100%; height:10;" class="LeftText" style="font:Demi_10; color:friendly; wrap:true;"/>
+		</BluePrint>
+		<BluePrint name="constraintsEntry" instantiable="true">
+			<!--<<Border dimensions="left:4; right:60%-2; top:4; bottom:100%" class="BlueBackDrop"/>
+			<Border dimensions="left:60%+2; right:100%-4; top:4; bottom:100%" class="GreyBackDrop"/>-->
+			<ListLayout name="constraintList" dimensions="left:0; top:7; height: 20; width:100%;" style="vpadding:1">
+				<Group dimensions="width: 100%; height:20" style="alpha:1">
+					<WebImage name="Icon" dimensions="left:50%-70; width:15; height:15; center-y:50%;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
+					 <Text key="{Mass}" name="stat" dimensions="left:50%-50; right:50%-3; top:4; bottom:100%" class="LeftText" style="font:Demi_11;"/>
+					 <Text name="value" dimensions="left:50%+3; right:100%; top:6; bottom:100%" class="LeftText" style="font:Demi_11; color:friendly"/>
+				</Group>
+				<Group dimensions="width: 100%; height:20" style="alpha:1">
+					<WebImage name="Icon" dimensions="left:50%-70; width:15; height:15; center-y:50%;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
+					 <Text key="{Power}" name="stat" dimensions="left:50%-50; right:50%-3; top:4; bottom:100%" class="LeftText" style="font:Demi_11;"/>
+					 <Text name="value" dimensions="left:50%+3; right:100%; top:6; bottom:100%" class="LeftText" style="font:Demi_11; color:friendly"/>
+				</Group>
+				<Group dimensions="width: 100%; height:20" style="alpha:1">
+					 <WebImage name="Icon" dimensions="left:50%-70; width:15; height:15; center-y:50%;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
+					 <Text key="{CPU}" name="stat" dimensions="left:50%-50; right:50%-3; top:4; bottom:100%" class="LeftText" style="font:Demi_11;"/>
+					 <Text name="value" dimensions="left:50%+3; right:100%; top:6; bottom:100%" class="LeftText" style="font:Demi_11; color:friendly"/>
+				</Group>
+			</ListLayout>
+		</BluePrint>
+		
+		<BluePrint name="PageButton" instantiable="true">
+			<FocusBox name="page_btn" class="ui_button" dimensions="width:35; height:35;">
+				<Group name="skin" dimensions="dock:fill"/>
+				<Text name="text" dimensions="dock:fill" style="font:UbuntuMedium_11; halign:center; valign:center; wrap:false; clip:true; cursor:sys_hand; eatsmice:false" />
+			</FocusBox>
+		</BluePrint>
+		<BluePrint name="category" instantiable="true">
+			<Border name="background" dimensions="dock:fill" class="BlueBackDrop"/>
+			<Text name="name" dimensions="left:15; width:50; height:40;" class="CenterText" style="font:Demi_10; halign:left;"  key="{Bought}"/>
+			<WebImage name="Icon" dimensions="left:145; width:30; height:30;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
+		</BluePrint>
+	</BluePrints>
+
+	<Frames>
+		<PanelFrame name="HoverBox" dimensions="center-x:50%; center-y:50%; width:390; height:300" permanent="true" visible="false" depth="-33">
+			<Children>
+				<Group id="ToolTip" dimensions="width:370; height:300;" style="alpha:1">
+					<!--<Border dimensions="dock:fill" class="SolidBackDrop" />-->
+					<ListLayout id="BoxStats" dimensions="width:100%; bottom:100%; top:30;" style="vpadding:3">
+						
+					</ListLayout>
+					<Text id="BoxTxt" key="{Stats}" dimensions="top:0; left:0; width:100%; height:38" style="font:Demi_13; halign:center; valign:center; shadow:1; color:#00AAFF" />
+				</Group>
+			</Children>
+		</PanelFrame>
+		<PanelFrame name="Main" dimensions="center-x:50%; center-y:50%; width:100%; height:100%" permanent="true" visible="false" depth="-30">
+			<Children>	
+				<!---------------------------------
+				--	Top Header Bar
+				----------------------------------->
+				<Group id="TopBar" dimensions="top:0; height:50; width:100%;"  class="SolidBackDrop">
+					<StillArt id="BackPlate" dimensions="dock:fill" style="texture:colors; region:black; shadow:1; alpha:1.0;"/>
+					<FocusBox id="close_market" dimensions="right:100%-8; top:6; width:26; height:26;">
+						<Border class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5"/>
+						<StillArt name="X" dimensions="center-x:50%; center-y:50%; width:100%-10; height:100%-10" style="texture:Window; region:X; tint:#B82F06; cursor:sys_hand;"/>
+					</FocusBox>
+					
+					<FocusBox id="buy_tab" dimensions="left:50%-104; width:100; height:70%;">
+						<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.8; padding:5; tint:#111111; shadow:1"/>
+						<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Narrow_18B; color:#00EEEE; halign:center; valign:center; alpha:1.0" key="{Buy}"/>
+						<FocusBox name="focusBox" dimensions="dock:fill" class="ui_button" style="tint:#00FF00"/>
+					</FocusBox>
+					
+					<FocusBox id="sell_tab" dimensions="left:50%+4; width:100; height:70%;">
+						<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.8; padding:5; tint:#111111; shadow:1"/>
+						<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Narrow_18B; color:#00EEEE; halign:center; valign:center; alpha:1.0" key="{Sell}"/>
+						<FocusBox name="focusBox" dimensions="dock:fill" class="ui_button" style="tint:#00FF00"/>
+					</FocusBox>
+					
+					<WebImage id="crystite_icon" name="Icon" dimensions="left:50%+200; width:30; height:30;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
+					<Text id="crystite_count" key="{65346346}" dimensions="left:50%+245; width:50; height:50;" style="font:Demi_12; halign:center; valign:center; shadow:0; color:#00AAFF" />
+					
+					
+					<Text key="{ARES Exchange}" dimensions="top:0; left:100; width:100%; height:100%" style="font:Demi_15; halign:left; valign:center; shadow:0; color:PanelTitle" />
+				</Group>
+				<!---------------------------------
+				--	Sell Page
+				----------------------------------->
+				<Group id="sell_page" dimensions="center-x: 50%; top:60; height:87%; width: 80%;" style="alpha:1">
+					<Group id="inventory" dimensions = "left: 0; width:500; height:100%;">
+						<Border name="panelheader" dimensions="width:100%; top:0; bottom:40;" class="PanelBackDrop" />
+						<Text key="{Inventory}" dimensions="top:0; left:10; width:100%; height:40" style="font:Demi_15; halign:center; valign:center; shadow:0; color:PanelTitle" />
+						
+						<Group dimensions="left: 120; width:100%-120; top:45; bottom:75;" style="">
+							<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+							<Border dimensions="height:100%-4; width:100%-4;" class="SolidBackDrop" />
+							<TextInput id="InventorySearch" dimensions="dock:fill" class="Chat, #TextInput" tag="{TEST}" style="alpha:1.0; valign:center; wrap:false; maxlen:256; texture:colors; region:transparent;">
+								<Events>
+									<OnSubmit bind="SELLPAGE_UpdateInventory"/>
+									<OnTextChange bind="SELLPAGE_OnEnterSearchText"/>
+								</Events>
+							</TextInput>
+						</Group>
+						
+						<Border name="panelbody" dimensions="left: 120; width:100%-120; top:78; bottom:100%;" class="PanelBackDrop" />
+						<Group id="inventoryItems" dimensions="left: 120; width:100%-120; top:78; bottom:100%;">
+						</Group>
+						
+						<ListLayout id="InventoryCategories" dimensions="left:0; top:46; width:115; height:100%;" style="vpadding:3;">
+						</ListLayout>
+					</Group>
+					<Group id="listings" dimensions="left: 508; right:100%; height:100%;">
+						<Border name="panelheader" dimensions="width:100%; top:0; bottom:40;" class="PanelBackDrop" />
+						<Text id="myListingsTitle" key="{My Listings}" dimensions="top:0; left:10; width:100%; height:40" style="font:Demi_15; halign:center; valign:center; shadow:0; color:PanelTitle" />
+						<FocusBox id="refresh_listings_btn" dimensions="top:5; left:100%-35; width:30; height:30;" class="ui_button">
+							<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-4; width:100%-4;" style="texture:icons; region:rotate; tint:#FFFFFF; cursor:sys_hand;"/>
+						</FocusBox>
+						<Border name="panelbody" dimensions="width:100%; top:45; bottom:100%-200;" class="PanelBackDrop" />
+						<Group id="listingsTable" dimensions="width:100%; top:45; bottom:100%-205;"/>
+					</Group>
+					<Group id="ListForm" dimensions="left: 508; right:100%; top:100%-195; bottom:100%;" style="alpha:0">
+						<Border name="panelbody" dimensions="dock:fill" class="PanelBackDrop" />
+						
+						
+						<ListLayout dimensions="left:0; width:200; height:100%; top:50%-90">
+							<Group dimensions="width:100%; height:30;">
+								<Text id="list_quantity_text" dimensions="left:0; height:100%; width:100%-84;" style="font:Narrow_13; color:#AAAAAA; halign:right; wrap:true; valign:center; alpha:1.0" key="{Quantity (4534534)}"/>
+								<Group dimensions="left:100%-80; height:100%; right:100%;" style="">
+									<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+									<Border dimensions="height:100%-4; width:100%-4;" class="SolidBackDrop" />
+									<TextInput id="QuantityInput" dimensions="dock:fill" class="Chat, #TextInput" tag="{TEST}" style="alpha:1.0; valign:center; wrap:false; maxlen:256; texture:colors; region:transparent;">
+										<Events>
+											<OnTextChange bind="SELLPAGE_OnQuantityInput"/>
+											<OnLostFocus bind="SELLPAGE_OnQuantityLostFocus"/>
+										</Events>
+									</TextInput>
+								</Group>
+							</Group>
+							<Group dimensions="width:100%; height:30;">
+								<Text name="description_text" dimensions="left:0; height:100%; width:100%-84;" style="font:Narrow_13; color:#AAAAAA; halign:right; wrap:true; valign:center; alpha:1.0" key="{Price Per Unit}"/>
+								<Group dimensions="left:100%-80; height:100%; right:100%;" style="">
+									<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+									<Border dimensions="height:100%-4; width:100%-4;" class="SolidBackDrop" />
+									<TextInput id="PPUInput" dimensions="dock:fill" class="Chat, #TextInput" tag="{TEST}" style="alpha:1.0; valign:center; wrap:false; maxlen:256; texture:colors; region:transparent;">
+										<Events>
+											<OnTextChange bind="SELLPAGE_OnPPUInput"/>
+										</Events>
+									</TextInput>
+								</Group>
+							</Group>
+							<Group dimensions="width:100%; height:30;">
+								<Text name="description_text" dimensions="left:0; height:100%; width:100%-84;" style="font:Narrow_13; color:#AAAAAA; halign:right; wrap:true; valign:center; alpha:1.0" key="{Price}"/>
+								<Group dimensions="left:100%-80; height:100%; right:100%;" style="">
+									<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+									<Border dimensions="height:100%-4; width:100%-4;" class="SolidBackDrop" />
+									<TextInput id="PriceInput" dimensions="dock:fill" class="Chat, #TextInput" tag="{TEST}" style="alpha:1.0; valign:center; wrap:false; maxlen:256; texture:colors; region:transparent;">
+										<Events>
+											<OnTextChange bind="SELLPAGE_OnPriceInput"/>
+										</Events>
+									</TextInput>
+								</Group>
+							</Group>
+							<Group dimensions="width:100%; height:30;">
+								<Text name="listing_fee_desc" dimensions="left:0; height:100%; width:100%-84;" style="font:Narrow_13; color:#AAAAAA; halign:right; wrap:true; valign:center; alpha:1.0" key="{Listing Fee}"/>
+								<Text id="ListingFee" dimensions="left:100%-80; height:100%; right:100%;" style="font:Demi_13; color:#FF0000; halign:left; wrap:false; valign:center; alpha:1.0" key="{0}"/>
+							</Group>
+							<Group dimensions="width:100%; height:30;">
+								<Text name="claim_fee_desc" dimensions="left:0; height:100%; width:100%-84;" style="font:Narrow_13; color:#AAAAAA; halign:right; wrap:true; valign:center; alpha:1.0" key="{Claim Fee}"/>
+								<Text id="ReapingFee" dimensions="left:100%-80; height:100%; right:100%;" style="font:Demi_13; color:#FF0000; halign:left; wrap:false; valign:center; alpha:1.0" key="{0}"/>
+							</Group>
+							<Group dimensions="width:100%; height:30;">
+								<Text name="description_text" dimensions="left:0; height:100%; width:100%-84;" style="font:Narrow_13; color:#AAAAAA; halign:right; wrap:true; valign:center; alpha:1.0" key="{Profit (If Sold)}"/>
+								<Group dimensions="left:100%-80; height:100%; right:100%;" style="">
+									<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+									<Border dimensions="height:100%-4; width:100%-4;" class="SolidBackDrop" />
+									<TextInput id="ProfitInput" dimensions="dock:fill" class="Chat, #TextInput" tag="{TEST}" style="alpha:1.0; valign:center; wrap:false; maxlen:256; texture:colors; region:transparent;">
+										<Events>
+											<OnTextChange bind="SELLPAGE_OnProfitInput"/>
+										</Events>
+									</TextInput>
+								</Group>
+							</Group>
+						</ListLayout>
+						<ListLayout dimensions="left:205; height:100%; width:200; top:50%-90" style="vpadding:15;">
+							<FocusBox id="list_button" class="ui_button" dimensions="center-x:50%; center-y:50%; width:70%; height:32">
+								<Group name="skin" dimensions="dock:fill"/>
+								<Text name="label" dimensions="dock:fill" style="font:Wide_11B; halign:center; valign:center" key="{List Item}"/>
+							</FocusBox>
+							<FocusBox id="check_similar_button" class="ui_button" dimensions="center-x:50%; center-y:50%; width:70%; height:32">
+								<Group name="skin" dimensions="dock:fill"/>
+								<Text name="label" dimensions="dock:fill" style="font:Wide_11B; halign:center; valign:center; cursor:sys_hand;" key="{Find Similar}"/>
+							</FocusBox>
+							<Text id="ListingError" dimensions="center-x:50%; center-y:50%; width:70%; height:32" style="alpha:0; font:Demi_10; wrap:true; halign:center; color:#FF0000; valign:center;" key="{Error TXT}"/>
+						</ListLayout>
+						<FocusBox name="ItemInfo" dimensions="left:350; height:100%-8; right:100%-4;">
+							<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+							<!--<Text name="title" dimensions="top:0; width:100%; height:40;" style="font:Demi_15; wrap:true; color:#00EEEE; halign:center; valign:center; alpha:1.0" key="{Placeholder}"/>-->
+							<WebImage name="icon" dimensions="center-y:50%; width:80; height:80;" style="fixed-bounds:true; valign:center; halign:center; shadow:0.3;"/>
+							<Text name="description" dimensions="top:125; width:100%; bottom:100%-5;" style="font:Narrow_13; color:#AAAAAA; halign:center; wrap:true; valign:top; alpha:1.0" key="{Balance}"/>
+						</FocusBox>
+					</Group>
+				</Group>
+				<!---------------------------------
+				--	Buy Page
+				----------------------------------->
+				<Group id="buy_page" dimensions="center-x: 50%; top:60; height:87%; width: 80%;" style="alpha:1">
+					<Border name="panelbody" dimensions="dock:fill" class="PanelBackDrop" />
+
+					<Group dimensions="left:11; top:5; bottom:100%-10; width:319" class="SolidBackDrop">
+						<Border dimensions="dock:fill" class="SolidBackDrop" />
+						
+						<FocusBox id="search_button" dimensions="left:5; top:5; width:100%-121; height:32">
+							<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#00FF00"/>
+							<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Demi_13; halign:center; valign:center" key="{Search}"/>
+							<FocusBox name="focusBox" dimensions="dock:fill" class="ui_button" style="tint:#00FF00"/>
+						</FocusBox>
+						
+						<FocusBox id="back_button" dimensions="left:100%-111; top:5; width:32; height:32" class="ui_button">
+							<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+							<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-10; width:100%-10;" style="texture:arrows; region:left; tint:#FFFFFF; cursor:sys_hand;"/>
+						</FocusBox>
+						
+						<FocusBox id="refresh_button" dimensions="left:100%-74; top:5; width:32; height:32" class="ui_button">
+							<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+							<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-4; width:100%-4;" style="texture:icons; region:rotate; tint:#FFFFFF; cursor:sys_hand;"/>
+						</FocusBox>
+						
+						<FocusBox id="forward_button" dimensions="left:100%-37; top:5; width:32; height:32" class="ui_button">
+							<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+							<StillArt name="icon" dimensions="center-x:50%; center-y:50%; height:100%-10; width:100%-10;" style="texture:arrows; region:right; tint:#FFFFFF; cursor:sys_hand;"/>
+						</FocusBox>
+						
+						
+						<Group dimensions="left:5; top:42; width:100%-10; height:32" style="">
+							<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+							<Border dimensions="height:100%-4; width:100%-4;" class="SolidBackDrop" />
+							<TextInput id="SearchInput" dimensions="dock:fill" class="Chat, #TextInput" tag="{TEST}" style="alpha:1.0; valign:center; wrap:false; maxlen:256; texture:colors; region:transparent;">
+								<Events>
+									<OnSubmit bind="OnSearchSubmit"/>
+									<!--
+									<OnGotFocus bind="OnGotFocus"/>
+									<OnLostFocus bind="OnLostFocus"/>
+									<OnTextChange bind="OnChatType"/>
+									<OnTab bind="OnTabKey"/>
+									<OnPrevious bind="OnUpArrow"/>
+									<OnNext bind="OnDownArrow"/>-->
+								</Events>
+							</TextInput>
+						</Group>
+						
+						
+						
+						
+						<Group dimensions="left:0; top:77; bottom:247; width:100%" class="SolidBackDrop" style="tint:#00FF00;">
+							<Text key="{Categories}" dimensions="top:0; left:10; height: 32; width:100%;" style="font:UbuntuBold_13; halign:left; valign:center; color:#00AAFF;"/>
+							<Border dimensions="height:100%; width:100%-10; left:5;" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+							<Choice id="CategoryChoice" dimensions="top:30; left:10; width:100%-20; height:30;"/>
+							
+							<ListLayout id="CategoryChildren" dimensions="left:10; top:70; right:100%-50; bottom:100%;" style="vpadding:3"/>
+						</Group>
+						
+						<Group dimensions="left:0; top:252; bottom:387; width:100%" class="SolidBackDrop" style="tint:#00FF00;">
+							<Text key="{Constraints}" dimensions="top:0; left:10; height: 32; width:100%;" style="font:UbuntuBold_13; halign:left; valign:center; color:#00AAFF;"/>
+							<Border dimensions="height:100%; width:100%-10; left:5;" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+							<Choice id="FrameChoice" dimensions="top:30; left:10; width:100%-20; height:30;"/>
+							<Choice id="ExcludeChoice" dimensions="top:65; left:10; width:100%-20; height:30;"/>
+							
+							<FocusBox id="calc_constraints" dimensions="top:100; left:10; width:100%-20; height:30;">
+								<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+								<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Demi_11; halign:center; valign:center" key="{Add Constraints Filter}"/>
+								<FocusBox name="focusBox" dimensions="dock:fill" class="ui_button" style="tint:#11AAFF"/>
+							</FocusBox>
+						</Group>
+						
+						<Group dimensions="left:0; top:392; bottom:100%-5; width:100%" class="SolidBackDrop" style="tint:#00FF00;">
+							<Text key="{Filters}" dimensions="top:0; left:10; height: 32; width:100%;" style="font:UbuntuBold_13; halign:left; valign:center; color:#00AAFF;"/>
+							<Border dimensions="height:100%; width:100%-10; left:5;" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />
+							
+							<FocusBox id="add_filter_btn" dimensions="top:4; right:100%-10; height: 25; width:25;" class="ui_button">
+								<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+								<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Demi_11; halign:center; valign:center; cursor:sys_hand;" key="{+}"/>
+							</FocusBox>
+							
+							<!--<Choice id="FilterChoice" dimensions="top:30; left:10; width:100%-80; height:30;"/>
+							<FocusBox id="add_filter_btn" dimensions="top:30; right:100%-10; width:55; height:30;">
+								<Border name="bgbtn" class="SmallBorders" dimensions="dock:fill" style="alpha:0.5; padding:5; tint:#11AAFF"/>
+								<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:Demi_11; halign:center; valign:center" key="{Add}"/>
+								<FocusBox name="focusBox" dimensions="dock:fill" class="ui_button" style="tint:#11AAFF"/>
+							</FocusBox>-->
+							
+							<Group id="filter_list" dimensions="left:0; top:35; bottom:100%; width:100%"/>
+						</Group>
+					</Group>
+
+					<Group id="item_list" dimensions="left:340; top:5; bottom:100%-53; right:100%-10">
+						<!--<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5;" />-->
+					</Group>
+					
+					<Group id="paging" dimensions="left:340; top:100%-48; bottom:100%-10; right:100%-10">
+						<Border dimensions="dock:fill" class="SolidBackDrop" />
+						<Group id="PageButtons" dimensions="center-x:50%; height:100%; width:50%">
+							
+						</Group>
+					</Group>
+					
+					<Group id="SearchError" dimensions="left:340; top:5; bottom:100%-53; right:100%-10" visible="false">
+						<Group name="wr" dimensions="top:10%; width:60%; height: 30%;">
+							<Border dimensions="dock:fill" class="BlueBackDrop"  style="alpha:0.5; padding:5; tint:#FF0000" />
+							<Text name="title" dimensions="center-x:50%; center-y:30%; width:100%; height:100%;" style="font:Wide_15B; halign:center; valign:center" key="{Search Error!}"/>
+							<Text name="label" dimensions="center-x:50%; center-y:50%; width:100%; height:100%;" style="font:UbuntuBold_11; halign:center; valign:center" key="{Too many searches, please wait!}"/>
+						</Group>
+					</Group>
+				</Group>
+			</Children>
+			<OnMessage bind="OnEvent"/>
+			<OnOpen bind="OnOpen"/>
+			<OnClose bind="OnClose"/>
+			<OnEscape bind="OnEscape"/>
+		</PanelFrame>
+	</Frames>
+
+</Component>
